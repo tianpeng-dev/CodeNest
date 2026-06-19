@@ -18,4 +18,23 @@ describe('markdown renderer', () => {
     expect(html).not.toContain('onerror');
     expect(html).not.toContain('<script');
   });
+
+  it('preserves safe link query strings without double escaping', () => {
+    const html = renderMarkdown(
+      '[docs](https://example.com?a=1&b=2)',
+    );
+
+    expect(html).toContain('href="https://example.com?a=1&amp;b=2"');
+    expect(html).not.toContain('&amp;amp;');
+  });
+
+  it('blocks unsafe link protocols', () => {
+    const html = renderMarkdown(
+      '[bad](javascript:alert(1)) [also-bad](data:text/html,alert)',
+    );
+
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('data:text');
+    expect(html).toContain('href="#"');
+  });
 });

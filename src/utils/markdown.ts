@@ -16,8 +16,17 @@ function escapeHtml(input: string) {
     .replace(/'/g, '&#39;');
 }
 
+function unescapeHtml(input: string) {
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 function sanitizeUrl(url: string) {
-  const trimmed = url.trim();
+  const trimmed = unescapeHtml(url).trim();
   if (/^(https?:|mailto:|\/|#)/i.test(trimmed)) {
     return escapeHtml(trimmed);
   }

@@ -21,6 +21,7 @@ const loadingMessages = ref(false);
 const sending = ref(false);
 const errorMessage = ref('');
 const messageError = ref('');
+const messageRequestSequence = ref(0);
 
 const selectedThread = computed(() => {
   return threads.value.find((thread) => thread.id === selectedThreadId.value) ?? null;
@@ -33,51 +34,82 @@ const formatter = new Intl.DateTimeFormat('zh-CN', {
   minute: '2-digit',
 });
 
-async function loadThreads() {
+async function loadThreads(options: { preserveSelection?: boolean } = {}) {
   loadingThreads.value = true;
   errorMessage.value = '';
 
   try {
-    threads.value = await getThreads();
+    const nextThreads = await getThreads();
+    threads.value = nextThreads;
     const targetUserId = String(route.query.to ?? '');
-    const targetThread =
-      threads.value.find((thread) => thread.participant.id === targetUserId) ??
-      threads.value[0] ??
-      null;
+    const targetThread = options.preserveSelection
+      ? nextThreads.find((thread) => thread.id === selectedThreadId.value) ?? null
+      : threads.value.find((thread) => thread.participant.id === targetUserId) ??
+        threads.value[0] ??
+        null;
     selectedThreadId.value = targetThread?.id ?? '';
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '私信列表加载失败';
     threads.value = [];
-    selectedThreadId.value = '';
+    if (!options.preserveSelection) {
+      selectedThreadId.value = '';
+    }
   } finally {
     loadingThreads.value = false;
   }
 }
 
 async function loadMessages(threadId: string) {
+  const requestId = messageRequestSequence.value + 1;
+  messageRequestSequence.value = requestId;
+
   if (!threadId) {
     messages.value = [];
+    messageError.value = '';
+    loadingMessages.value = false;
     return;
   }
 
+  const requestedThreadId = threadId;
   loadingMessages.value = true;
   messageError.value = '';
 
   try {
-    messages.value = await getThreadMessages(threadId);
+    const nextMessages = await getThreadMessages(requestedThreadId);
+    if (
+      requestId !== messageRequestSequence.value ||
+      selectedThreadId.value !== requestedThreadId
+    ) {
+      return;
+    }
+
+    messages.value = nextMessages;
   } catch (error) {
+    if (
+      requestId !== messageRequestSequence.value ||
+      selectedThreadId.value !== requestedThreadId
+    ) {
+      return;
+    }
+
     messageError.value =
       error instanceof Error ? error.message : '会话内容加载失败';
     messages.value = [];
   } finally {
-    loadingMessages.value = false;
+    if (
+      requestId === messageRequestSequence.value &&
+      selectedThreadId.value === requestedThreadId
+    ) {
+      loadingMessages.value = false;
+    }
   }
 }
 
 async function sendMessage() {
   const trimmed = draft.value.trim();
-  if (!selectedThreadId.value || !trimmed) {
+  const threadId = selectedThreadId.value;
+  if (!threadId || !trimmed) {
     ElMessage.warning('先选择会话并填写内容');
     return;
   }
@@ -85,12 +117,16 @@ async function sendMessage() {
   sending.value = true;
 
   try {
-    const sent = await mockSendMessage(selectedThreadId.value, trimmed);
-    messages.value = [...messages.value, sent];
-    draft.value = '';
+    const sent = await mockSendMessage(threadId, trimmed);
+    const stillSelected = selectedThreadId.value === threadId;
+
+    if (stillSelected) {
+      messages.value = [...messages.value, sent];
+      draft.value = '';
+    }
+
     ElMessage.success('私信已发送');
-    await loadThreads();
-    selectedThreadId.value = sent.threadId;
+    await loadThreads({ preserveSelection: true });
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '发送失败');
   } finally {
