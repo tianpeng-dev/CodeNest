@@ -169,6 +169,7 @@ function applyPostQuery(
   const keyword = stringParam(query.keyword)?.toLowerCase();
   const categorySlug = stringParam(query.categorySlug);
   const categoryId = stringParam(query.categoryId);
+  const authorId = stringParam(query.authorId);
   const tag = stringParam(query.tag);
   const tags = Array.isArray(query.tags) ? query.tags : undefined;
   const status = stringParam(query.status);
@@ -184,6 +185,7 @@ function applyPostQuery(
     const matchesCategory =
       (!categorySlug || post.category.slug === categorySlug) &&
       (!categoryId || post.category.id === categoryId);
+    const matchesAuthor = !authorId || post.author.id === authorId;
     const matchesTag =
       !tag && !tags?.length
         ? true
@@ -196,6 +198,7 @@ function applyPostQuery(
       matchesDeleted &&
       matchesKeyword &&
       matchesCategory &&
+      matchesAuthor &&
       matchesTag &&
       matchesStatus
     );

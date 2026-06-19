@@ -1,7 +1,14 @@
 import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
 import { resetMockApi, setupMockApi } from '@/mocks/mock';
 import { getAdminMetrics } from '@/services/admin.service';
-import { createDraft, getPosts, getPostById } from '@/services/post.service';
+import { getNotifications, markNotificationRead } from '@/services/notification.service';
+import { getThreads, getThreadMessages, mockSendMessage } from '@/services/message.service';
+import {
+  createDraft,
+  getPosts,
+  getPostById,
+  togglePostAction,
+} from '@/services/post.service';
 
 beforeAll(() => {
   setupMockApi();
@@ -23,6 +30,58 @@ describe('post service', () => {
     const list = await getPosts({ page: 1, pageSize: 1 });
     const post = await getPostById(list.items[0].id);
     expect(post.id).toBe(list.items[0].id);
+  });
+
+  it('filters posts by category slug and author id', async () => {
+    const byCategory = await getPosts({
+      categorySlug: 'frontend',
+      status: 'published',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(byCategory.items.length).toBeGreaterThan(0);
+    expect(byCategory.items.every((post) => post.category.slug === 'frontend')).toBe(true);
+
+    const byAuthor = await getPosts({
+      authorId: 'user-001',
+      status: 'published',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(byAuthor.items.length).toBeGreaterThan(0);
+    expect(byAuthor.items.every((post) => post.author.id === 'user-001')).toBe(true);
+  });
+
+  it('updates post interaction counts through the action service', async () => {
+    window.localStorage.setItem('codenest_token', 'mock-token-admin');
+    const post = await getPostById('post-001');
+
+    const liked = await togglePostAction(post.id, 'like');
+    expect(liked.likeCount).toBe(post.likeCount + 1);
+
+    const favorited = await togglePostAction(post.id, 'favorite');
+    expect(favorited.favoriteCount).toBe(post.favoriteCount + 1);
+  });
+
+  it('marks notifications read and appends mock messages', async () => {
+    window.localStorage.setItem('codenest_token', 'mock-token-admin');
+
+    const notifications = await getNotifications();
+    const unread = notifications.find((notification) => !notification.readAt);
+    expect(unread).toBeTruthy();
+
+    const readNotification = await markNotificationRead(unread!.id);
+    expect(readNotification.readAt).toBeTruthy();
+
+    const threads = await getThreads();
+    const thread = threads[0];
+    const before = await getThreadMessages(thread.id);
+    const sent = await mockSendMessage(thread.id, '收到，我稍后整理。');
+    const after = await getThreadMessages(thread.id);
+
+    expect(sent.content).toBe('收到，我稍后整理。');
+    expect(after).toHaveLength(before.length + 1);
+    expect(after.at(-1)?.id).toBe(sent.id);
   });
 
   it('rejects protected calls with invalid tokens', async () => {
