@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { canAccessRoute } from '@/app/permissions';
 import { resetMockApi, setupMockApi } from '@/mocks/mock';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -66,14 +67,18 @@ describe('auth store', () => {
     expect(authStore.currentUser).toBeNull();
   });
 
-  it('loads the current user from a valid token', async () => {
+  it('loads the quick-fill writer as an active normal user', async () => {
     window.localStorage.setItem('codenest_token', 'mock-token-writer');
     const authStore = useAuthStore();
 
     await authStore.loadCurrentUser();
 
     expect(authStore.currentUser?.username).toBe('chen-dev');
+    expect(authStore.currentUser?.role).toBe('user');
+    expect(authStore.currentUser?.status).toBe('active');
     expect(authStore.isLoggedIn).toBe(true);
+    expect(authStore.isAdmin).toBe(false);
+    expect(canAccessRoute('user', authStore.currentUser)).toBe(true);
   });
 
   it('logs out and clears auth state', async () => {
