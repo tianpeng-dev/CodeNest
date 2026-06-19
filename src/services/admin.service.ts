@@ -1,6 +1,10 @@
-import type { AdminMetric, SensitiveWord } from '../types/admin';
+import type {
+  AdminMetric,
+  AdminModeratorSection,
+  SensitiveWord,
+} from '../types/admin';
 import type { ApiResponse, PageResult } from '../types/common';
-import type { Post, PostQuery } from '../types/post';
+import type { Category, Post, PostQuery } from '../types/post';
 import type { User } from '../types/user';
 import { http, unwrap } from './http';
 
@@ -25,5 +29,15 @@ export async function getAdminPosts(
 export async function getSensitiveWords(): Promise<SensitiveWord[]> {
   return unwrap(
     await http.get<ApiResponse<SensitiveWord[]>>('/admin/sensitive-words'),
+  );
+}
+
+export async function getAdminCategories(): Promise<Category[]> {
+  return unwrap(await http.get<ApiResponse<Category[]>>('/admin/categories'));
+}
+
+export async function getAdminModerators(): Promise<AdminModeratorSection[]> {
+  return unwrap(
+    await http.get<ApiResponse<AdminModeratorSection[]>>('/admin/moderators'),
   );
 }

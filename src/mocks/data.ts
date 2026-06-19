@@ -1,4 +1,4 @@
-import type { SensitiveWord } from '../types/admin';
+import type { AdminModeratorSection, SensitiveWord } from '../types/admin';
 import type { PiePoint, TrendPoint } from '../types/analytics';
 import type { Comment } from '../types/comment';
 import type { MessageItem, MessageThread } from '../types/message';
@@ -338,5 +338,63 @@ export const mockSensitiveWords: SensitiveWord[] = [
     level: 'high',
     createdAt: '2026-04-15T08:00:00.000Z',
     hitCount: 4,
+  },
+];
+
+export const mockModeratorSections: AdminModeratorSection[] = [
+  {
+    id: 'mod-section-frontend',
+    sectionName: '前端工程',
+    description: '负责前端工程分类的内容巡检、精选推荐和争议回复。',
+    moderatorCount: 2,
+    moderators: [
+      {
+        id: adminUser.id,
+        username: adminUser.username,
+        displayName: adminUser.displayName,
+        status: adminUser.status,
+        avatarUrl: adminUser.avatarUrl,
+      },
+      {
+        id: memberUser.id,
+        username: memberUser.username,
+        displayName: memberUser.displayName,
+        status: memberUser.status,
+        avatarUrl: memberUser.avatarUrl,
+      },
+    ],
+    updatedAt: '2026-05-24T09:30:00.000Z',
+  },
+  {
+    id: 'mod-section-backend',
+    sectionName: '后端架构',
+    description: '关注后端架构文章质量、标签归类和评论区技术争议。',
+    moderatorCount: 1,
+    moderators: [
+      {
+        id: adminUser.id,
+        username: adminUser.username,
+        displayName: adminUser.displayName,
+        status: adminUser.status,
+        avatarUrl: adminUser.avatarUrl,
+      },
+    ],
+    updatedAt: '2026-05-22T04:10:00.000Z',
+  },
+  {
+    id: 'mod-section-growth',
+    sectionName: '社区运营',
+    description: '处理运营分析、审核策略和用户增长相关内容的版务。',
+    moderatorCount: 1,
+    moderators: [
+      {
+        id: productUser.id,
+        username: productUser.username,
+        displayName: productUser.displayName,
+        status: productUser.status,
+        avatarUrl: productUser.avatarUrl,
+      },
+    ],
+    updatedAt: '2026-05-20T06:20:00.000Z',
   },
 ];

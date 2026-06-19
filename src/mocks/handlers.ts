@@ -10,6 +10,7 @@ import {
   mockCategories,
   mockComments,
   mockMessages,
+  mockModeratorSections,
   mockNotifications,
   mockPie,
   mockPosts,
@@ -782,6 +783,11 @@ export function registerMockHandlers(mock: AxiosMockAdapter) {
 
   mock.onGet('/admin/categories').reply((config) => {
     const forbidden = adminReply(config);
-    return forbidden ?? ok(mockPie);
+    return forbidden ?? ok(mockCategories);
+  });
+
+  mock.onGet('/admin/moderators').reply((config) => {
+    const forbidden = adminReply(config);
+    return forbidden ?? ok(mockModeratorSections);
   });
 }
