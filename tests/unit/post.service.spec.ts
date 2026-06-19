@@ -5,9 +5,12 @@ import { getNotifications, markNotificationRead } from '@/services/notification.
 import { getThreads, getThreadMessages, mockSendMessage } from '@/services/message.service';
 import {
   createDraft,
+  deletePost,
   getPosts,
   getPostById,
+  publishPost,
   togglePostAction,
+  updatePost,
 } from '@/services/post.service';
 
 beforeAll(() => {
@@ -104,5 +107,39 @@ describe('post service', () => {
     window.localStorage.setItem('codenest_token', 'mock-token-writer');
 
     await expect(getAdminMetrics()).rejects.toThrow('无权访问');
+  });
+
+  it('rejects post mutations from non-owners', async () => {
+    window.localStorage.setItem('codenest_token', 'mock-token-writer');
+    const adminPost = await getPostById('post-001');
+    const payload = {
+      title: 'Unauthorized update',
+      summary: 'Writer should not update admin posts',
+      content: adminPost.content,
+      coverUrl: adminPost.coverUrl,
+      categoryId: adminPost.category.id,
+      tags: adminPost.tags,
+      status: 'draft' as const,
+    };
+
+    await expect(updatePost(adminPost.id, payload)).rejects.toThrow('无权访问');
+    await expect(publishPost(adminPost.id)).rejects.toThrow('无权访问');
+    await expect(deletePost(adminPost.id)).rejects.toThrow('无权访问');
+  });
+
+  it('allows admins to mutate any post', async () => {
+    window.localStorage.setItem('codenest_token', 'mock-token-admin');
+    const writerPost = await getPostById('post-002');
+    const updated = await updatePost(writerPost.id, {
+      title: 'Admin adjusted title',
+      summary: writerPost.summary,
+      content: writerPost.content,
+      coverUrl: writerPost.coverUrl,
+      categoryId: writerPost.category.id,
+      tags: writerPost.tags,
+      status: 'draft',
+    });
+
+    expect(updated.title).toBe('Admin adjusted title');
   });
 });

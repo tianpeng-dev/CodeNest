@@ -163,6 +163,18 @@ function findPost(id: string): Post | undefined {
   return posts.find((post) => post.id === id);
 }
 
+function postMutationReply(config: AxiosRequestConfig, post: Post): MockReply | null {
+  const unauthorized = protectedReply(config);
+  if (unauthorized) {
+    return unauthorized;
+  }
+
+  const user = currentUser(config);
+  return user?.role === 'admin' || user?.id === post.author.id
+    ? null
+    : fail(403, '无权访问');
+}
+
 function applyPostQuery(
   source: Post[],
   query: QueryParams,
@@ -487,29 +499,29 @@ export function registerMockHandlers(mock: AxiosMockAdapter) {
   });
 
   mock.onPut(/\/posts\/[^/]+$/).reply((config) => {
-    const unauthorized = protectedReply(config);
-    if (unauthorized) return unauthorized;
-
     const id = config.url?.split('/').at(-1) ?? '';
     const post = findPost(id);
 
     if (!post) {
       return fail(404, '帖子不存在');
     }
+
+    const forbidden = postMutationReply(config, post);
+    if (forbidden) return forbidden;
 
     return ok(updatePostFromPayload(post, getPayload<PostDraftPayload>(config)));
   });
 
   mock.onDelete(/\/posts\/[^/]+$/).reply((config) => {
-    const unauthorized = protectedReply(config);
-    if (unauthorized) return unauthorized;
-
     const id = config.url?.split('/').at(-1) ?? '';
     const post = findPost(id);
 
     if (!post) {
       return fail(404, '帖子不存在');
     }
+
+    const forbidden = postMutationReply(config, post);
+    if (forbidden) return forbidden;
 
     post.status = 'deleted';
     post.updatedAt = nowIso();
@@ -517,15 +529,15 @@ export function registerMockHandlers(mock: AxiosMockAdapter) {
   });
 
   mock.onPost(/\/posts\/[^/]+\/publish$/).reply((config) => {
-    const unauthorized = protectedReply(config);
-    if (unauthorized) return unauthorized;
-
     const [, id] = config.url?.match(/\/posts\/([^/]+)\/publish$/) ?? [];
     const post = id ? findPost(id) : undefined;
 
     if (!post) {
       return fail(404, '帖子不存在');
     }
+
+    const forbidden = postMutationReply(config, post);
+    if (forbidden) return forbidden;
 
     post.status = 'published';
     post.publishedAt = post.publishedAt ?? nowIso();
