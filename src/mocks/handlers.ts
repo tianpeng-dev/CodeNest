@@ -1,6 +1,7 @@
 import type { AxiosRequestConfig } from 'axios';
 import type AxiosMockAdapter from 'axios-mock-adapter';
 import type { AdminMetric } from '../types/admin';
+import type { CreatorColumn, CreatorComment } from '../services/creator.service';
 import type { PageResult } from '../types/common';
 import type { MessageItem } from '../types/message';
 import type { Post, PostDraftPayload } from '../types/post';
@@ -325,6 +326,58 @@ function adminMetrics(): AdminMetric[] {
     { label: '评论总数', value: commentsTotal, trend: 5 },
     { label: '敏感词命中', value: mockSensitiveWords.length, trend: -2 },
   ];
+}
+
+function creatorComments(authorId: string): CreatorComment[] {
+  const creatorPostMap = new Map(
+    posts
+      .filter((post) => post.author.id === authorId)
+      .map((post) => [post.id, post]),
+  );
+
+  return comments
+    .filter((comment) => creatorPostMap.has(comment.postId))
+    .map((comment) => {
+      const post = creatorPostMap.get(comment.postId);
+
+      return {
+        ...comment,
+        post: {
+          id: post?.id ?? comment.postId,
+          title: post?.title ?? '已删除文章',
+        },
+      };
+    });
+}
+
+function creatorColumns(authorId: string): CreatorColumn[] {
+  const groups = new Map<string, Post[]>();
+
+  posts
+    .filter((post) => post.author.id === authorId && post.status !== 'deleted')
+    .forEach((post) => {
+      const current = groups.get(post.category.id) ?? [];
+      current.push(post);
+      groups.set(post.category.id, current);
+    });
+
+  return [...groups.values()].map((items) => {
+    const [first] = items;
+    const latest = items.reduce((current, item) => {
+      return new Date(item.updatedAt).getTime() > new Date(current.updatedAt).getTime()
+        ? item
+        : current;
+    }, first);
+
+    return {
+      id: `column-${first.category.id}`,
+      title: `${first.category.name}专栏`,
+      description: first.category.description,
+      postCount: items.length,
+      coverUrl: first.coverUrl,
+      updatedAt: latest.updatedAt,
+    };
+  });
 }
 
 export function registerMockHandlers(mock: AxiosMockAdapter) {
@@ -685,6 +738,26 @@ export function registerMockHandlers(mock: AxiosMockAdapter) {
       trend: mockTrend,
       pie: mockPie,
     });
+  });
+
+  mock.onGet('/creator/comments').reply((config) => {
+    const unauthorized = protectedReply(config);
+    if (unauthorized) return unauthorized;
+
+    const author = currentUser(config);
+    if (!author) return fail(401, '请先登录');
+
+    return ok(creatorComments(author.id));
+  });
+
+  mock.onGet('/creator/columns').reply((config) => {
+    const unauthorized = protectedReply(config);
+    if (unauthorized) return unauthorized;
+
+    const author = currentUser(config);
+    if (!author) return fail(401, '请先登录');
+
+    return ok(creatorColumns(author.id));
   });
 
   mock.onGet('/admin/metrics').reply((config) => {

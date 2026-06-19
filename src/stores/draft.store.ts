@@ -24,6 +24,12 @@ export const useDraftStore = defineStore('draft', {
     setField<K extends keyof DraftFields>(field: K, value: DraftFields[K]) {
       this.draft[field] = value;
     },
+    replaceDraft(value: DraftFields) {
+      this.draft = {
+        ...value,
+        tags: [...value.tags],
+      };
+    },
     setEditingMode(mode: EditorMode) {
       this.editingMode = mode;
     },
