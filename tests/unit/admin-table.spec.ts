@@ -26,7 +26,14 @@ function mountTable() {
       rows,
       columns: [
         { key: 'name', label: '用户' },
-        { key: 'status', label: '状态' },
+        {
+          key: 'status',
+          label: '状态',
+          tag: (row) => ({
+            label: row.status === 'active' ? '正常' : '封禁',
+            type: row.status === 'active' ? 'success' : 'danger',
+          }),
+        },
       ],
       pageSize: 10,
     },
@@ -108,5 +115,15 @@ describe('AdminTablePage', () => {
     await wrapper.find('[data-testid="admin-table-filter"]').setValue('不存在');
 
     expect(wrapper.text()).toContain('没有匹配的数据');
+  });
+
+  it('filters rows by visible tag labels', async () => {
+    const wrapper = mountTable();
+
+    await wrapper.find('[data-testid="admin-table-filter"]').setValue('封禁');
+
+    expect(wrapper.text()).not.toContain('陈一鸣');
+    expect(wrapper.text()).toContain('静默作者');
+    expect(wrapper.text()).toContain('封禁');
   });
 });

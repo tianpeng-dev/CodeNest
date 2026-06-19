@@ -48,8 +48,11 @@ const page = ref(1);
 const getRowText = (row: Row) => {
   return props.columns
     .map((column) => {
-      if (column.formatter) return column.formatter(row);
-      return String((row as Record<string, unknown>)[column.key] ?? '');
+      const rawValue = String((row as Record<string, unknown>)[column.key] ?? '');
+      const formattedValue = column.formatter ? String(column.formatter(row)) : '';
+      const tagLabel = column.tag?.(row).label ?? '';
+
+      return [tagLabel, formattedValue, rawValue].filter(Boolean).join(' ');
     })
     .join(' ')
     .toLowerCase();
