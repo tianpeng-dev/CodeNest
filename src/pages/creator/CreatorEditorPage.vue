@@ -11,6 +11,12 @@ const router = useRouter();
 const draftStore = useDraftStore();
 const saving = ref(false);
 const publishing = ref(false);
+const isPersisting = ref(false);
+let persistPromise: Promise<Post> | null = null;
+
+const isBusy = computed(() => {
+  return saving.value || publishing.value || isPersisting.value;
+});
 
 const draft = computed({
   get: () => draftStore.draft,
@@ -54,21 +60,35 @@ function validateDraft(payload: PostDraftPayload) {
 }
 
 async function persistDraft(payload: PostDraftPayload): Promise<Post> {
+  if (persistPromise) {
+    return persistPromise;
+  }
+
   const draftPayload: PostDraftPayload = {
     ...payload,
     status: 'draft',
   };
 
-  if (draftStore.currentDraftId) {
-    const updated = await updatePost(draftStore.currentDraftId, draftPayload);
-    draftStore.replaceDraft(draftPayload);
-    return updated;
-  }
+  isPersisting.value = true;
+  persistPromise = (async () => {
+    if (draftStore.currentDraftId) {
+      const updated = await updatePost(draftStore.currentDraftId, draftPayload);
+      draftStore.replaceDraft(draftPayload);
+      return updated;
+    }
 
-  const created = await createDraft(draftPayload);
-  draftStore.setCurrentDraftId(created.id);
-  draftStore.replaceDraft(draftPayload);
-  return created;
+    const created = await createDraft(draftPayload);
+    draftStore.setCurrentDraftId(created.id);
+    draftStore.replaceDraft(draftPayload);
+    return created;
+  })();
+
+  try {
+    return await persistPromise;
+  } finally {
+    persistPromise = null;
+    isPersisting.value = false;
+  }
 }
 
 async function saveDraft() {
@@ -100,6 +120,10 @@ async function publishCurrentDraft() {
   publishing.value = true;
 
   try {
+    if (persistPromise) {
+      await persistPromise;
+    }
+
     await persistDraft(payload);
     const postId = draftStore.currentDraftId;
 
@@ -128,6 +152,7 @@ async function publishCurrentDraft() {
     v-model:mode="mode"
     :saving="saving"
     :publishing="publishing"
+    :disabled="isBusy"
     @save="saveDraft"
     @publish="publishCurrentDraft"
   />

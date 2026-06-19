@@ -12,6 +12,7 @@ const props = defineProps<{
   mode: EditorMode;
   saving?: boolean;
   publishing?: boolean;
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -116,8 +117,15 @@ function openAiDialog(type: 'topic' | 'article') {
         <el-button :icon="Cpu" @click="openAiDialog('article')">
           AI 成文
         </el-button>
-        <el-button :loading="saving" @click="$emit('save')">保存草稿</el-button>
-        <el-button type="primary" :loading="publishing" @click="$emit('publish')">
+        <el-button :loading="saving" :disabled="disabled" @click="$emit('save')">
+          保存草稿
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="publishing"
+          :disabled="disabled"
+          @click="$emit('publish')"
+        >
           发布
         </el-button>
       </div>

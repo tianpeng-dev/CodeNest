@@ -1,5 +1,5 @@
 import { defineComponent, h, nextTick } from 'vue';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CreatorEditorPage from '@/pages/creator/CreatorEditorPage.vue';
@@ -44,12 +44,14 @@ vi.mock('@/modules/editor/EditorShell.vue', () => ({
       mode: { type: String, required: true },
       saving: { type: Boolean, default: false },
       publishing: { type: Boolean, default: false },
+      disabled: { type: Boolean, default: false },
     },
     emits: ['update:modelValue', 'update:mode', 'save', 'publish'],
     setup(props, { emit }) {
       return () =>
         h('section', { 'data-testid': 'editor-shell' }, [
           h('span', { 'data-testid': 'editor-title' }, props.modelValue.title),
+          h('span', { 'data-testid': 'editor-disabled' }, String(props.disabled)),
           h(
             'button',
             {
@@ -232,6 +234,7 @@ describe('creator editor page', () => {
     await nextTick();
 
     await wrapper.find('[data-testid="publish-post"]').trigger('click');
+    await flushPromises();
 
     expect(createDraftMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -269,6 +272,7 @@ describe('creator editor page', () => {
     draftStore.setField('content', '发布前更新正文');
     await nextTick();
     await wrapper.find('[data-testid="publish-post"]').trigger('click');
+    await flushPromises();
 
     expect(createDraftMock).toHaveBeenCalledTimes(1);
     expect(updatePostMock).toHaveBeenCalledWith(
@@ -280,5 +284,85 @@ describe('creator editor page', () => {
     );
     expect(publishPostMock).toHaveBeenCalledWith('draft-saved');
     expect(draftStore.currentDraftId).toBeNull();
+  });
+
+  it('waits for an overlapping save before publishing the same draft id', async () => {
+    let resolveCreate: (post: Post) => void = () => {};
+    createDraftMock.mockImplementationOnce(() => {
+      return new Promise<Post>((resolve) => {
+        resolveCreate = resolve;
+      });
+    });
+    createDraftMock.mockResolvedValueOnce(postFixture({ id: 'duplicate-draft' }));
+    updatePostMock.mockResolvedValueOnce(postFixture({ id: 'draft-overlap' }));
+    publishPostMock.mockResolvedValueOnce(
+      postFixture({
+        id: 'draft-overlap',
+        status: 'published',
+        publishedAt: '2026-06-19T01:00:00.000Z',
+      }),
+    );
+    const wrapper = mountPage();
+    const draftStore = useDraftStore();
+
+    draftStore.setField('title', '并发保存发布');
+    draftStore.setField('summary', '并发摘要');
+    draftStore.setField('content', '并发正文');
+    draftStore.setField('categoryId', 'cat-frontend');
+    await nextTick();
+
+    const saveTrigger = wrapper.find('[data-testid="save-draft"]').trigger('click');
+    await nextTick();
+    const publishTrigger = wrapper.find('[data-testid="publish-post"]').trigger('click');
+    await nextTick();
+
+    expect(createDraftMock).toHaveBeenCalledTimes(1);
+
+    resolveCreate(postFixture({ id: 'draft-overlap' }));
+    await saveTrigger;
+    await publishTrigger;
+    await flushPromises();
+
+    expect(createDraftMock).toHaveBeenCalledTimes(1);
+    expect(updatePostMock).toHaveBeenCalledWith(
+      'draft-overlap',
+      expect.objectContaining({
+        title: '并发保存发布',
+        status: 'draft',
+      }),
+    );
+    expect(publishPostMock).toHaveBeenCalledWith('draft-overlap');
+    expect(pushMock).toHaveBeenCalledWith({
+      name: 'post-detail',
+      params: { id: 'draft-overlap' },
+    });
+  });
+
+  it('marks editor actions disabled while persistence is in flight', async () => {
+    let resolveCreate: (post: Post) => void = () => {};
+    createDraftMock.mockImplementationOnce(() => {
+      return new Promise<Post>((resolve) => {
+        resolveCreate = resolve;
+      });
+    });
+    const wrapper = mountPage();
+    const draftStore = useDraftStore();
+
+    draftStore.setField('title', '禁用状态草稿');
+    draftStore.setField('summary', '禁用摘要');
+    draftStore.setField('content', '禁用正文');
+    draftStore.setField('categoryId', 'cat-frontend');
+    await nextTick();
+
+    const saveTrigger = wrapper.find('[data-testid="save-draft"]').trigger('click');
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="editor-disabled"]').text()).toBe('true');
+
+    resolveCreate(postFixture({ id: 'draft-disabled' }));
+    await saveTrigger;
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="editor-disabled"]').text()).toBe('false');
   });
 });
