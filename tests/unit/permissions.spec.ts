@@ -24,6 +24,22 @@ const activeAdmin: User = {
   role: 'admin',
 };
 
+const bannedUser: User = {
+  ...activeUser,
+  id: 'user-103',
+  username: 'muted-writer',
+  status: 'banned',
+  muteUntil: '2026-07-01T09:00:00.000Z',
+};
+
+const bannedAdmin: User = {
+  ...activeAdmin,
+  id: 'user-104',
+  username: 'muted-admin',
+  status: 'banned',
+  muteUntil: '2026-07-01T09:00:00.000Z',
+};
+
 describe('canAccessRoute', () => {
   it('allows a public route for a guest', () => {
     expect(canAccessRoute('public', null)).toBe(true);
@@ -39,5 +55,13 @@ describe('canAccessRoute', () => {
 
   it('allows an admin route for an active admin', () => {
     expect(canAccessRoute('admin', activeAdmin)).toBe(true);
+  });
+
+  it('blocks a user route for a banned normal user', () => {
+    expect(canAccessRoute('user', bannedUser)).toBe(false);
+  });
+
+  it('blocks an admin route for a banned admin', () => {
+    expect(canAccessRoute('admin', bannedAdmin)).toBe(false);
   });
 });

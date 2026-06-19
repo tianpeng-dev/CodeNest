@@ -51,7 +51,22 @@ const productUser: User = {
   followerCount: 540,
 };
 
-export const mockUsers: User[] = [adminUser, memberUser, productUser];
+const bannedUser: User = {
+  id: 'user-004',
+  username: 'muted_writer',
+  displayName: '静默作者',
+  avatarUrl: 'https://api.dicebear.com/9.x/initials/svg?seed=Muted',
+  bio: '用于验证封禁与静默状态的普通用户样例。',
+  role: 'user',
+  status: 'banned',
+  muteUntil: '2026-07-01T09:00:00.000Z',
+  postCount: 2,
+  likeCount: 16,
+  favoriteCount: 4,
+  followerCount: 28,
+};
+
+export const mockUsers: User[] = [adminUser, memberUser, productUser, bannedUser];
 
 const frontendCategory: Category = {
   id: 'cat-frontend',
