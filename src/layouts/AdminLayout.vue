@@ -77,7 +77,7 @@ const displayName = computed(() => authStore.currentUser?.displayName ?? '管理
   padding: 28px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .admin-layout {
     display: block;
   }

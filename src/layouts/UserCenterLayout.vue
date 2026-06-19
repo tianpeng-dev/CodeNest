@@ -68,7 +68,7 @@ const activePath = computed(() => route.path);
   padding: 28px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .creator-layout {
     display: block;
   }

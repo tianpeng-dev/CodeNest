@@ -1,6 +1,17 @@
+<script setup lang="ts">
+import ForbiddenState from '@/components/ForbiddenState.vue';
+</script>
+
 <template>
-  <main class="placeholder-page">
-    <h1>403</h1>
-    <p>Task 5 placeholder only.</p>
+  <main class="error-page">
+    <ForbiddenState />
   </main>
 </template>
+
+<style scoped>
+.error-page {
+  display: grid;
+  min-height: min(520px, calc(100vh - 160px));
+  place-items: center;
+}
+</style>

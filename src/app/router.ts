@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { canAccessRoute, type RouteAccess } from './permissions';
-import { setPageTitle } from './head';
+import { setPageDescription, setPageTitle } from './head';
 import { useAuthStore } from '@/stores/auth.store';
 
 declare module 'vue-router' {
   interface RouteMeta {
     access?: RouteAccess;
+    description?: string;
     title?: string;
   }
 }
@@ -30,25 +31,41 @@ export const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('@/pages/public/HomePage.vue'),
-          meta: { access: 'public', title: '首页' },
+          meta: {
+            access: 'public',
+            title: '首页',
+            description: 'CodeNest 技术社区首页，发现推荐博客、热门讨论和创作者内容。',
+          },
         },
         {
           path: 'search',
           name: 'search',
           component: () => import('@/pages/public/SearchPage.vue'),
-          meta: { access: 'public', title: '搜索' },
+          meta: {
+            access: 'public',
+            title: '搜索',
+            description: '搜索 CodeNest 技术文章、分类和社区讨论。',
+          },
         },
         {
           path: 'category/:slug',
           name: 'category',
           component: () => import('@/pages/public/CategoryPage.vue'),
-          meta: { access: 'public', title: '分类' },
+          meta: {
+            access: 'public',
+            title: '分类',
+            description: '浏览 CodeNest 分类频道下的精选技术内容。',
+          },
         },
         {
           path: 'post/:id',
           name: 'post-detail',
           component: () => import('@/pages/public/PostDetailPage.vue'),
-          meta: { access: 'public', title: '帖子详情' },
+          meta: {
+            access: 'public',
+            title: '帖子详情',
+            description: '阅读 CodeNest 技术文章详情、评论和作者动态。',
+          },
         },
         {
           path: 'u/:id',
@@ -166,7 +183,11 @@ export const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/pages/auth/LoginPage.vue'),
-      meta: { access: 'public', title: '登录' },
+      meta: {
+        access: 'public',
+        title: '登录',
+        description: '登录 CodeNest，进入创作中心、通知和私信。',
+      },
     },
     {
       path: '/register',
@@ -184,7 +205,11 @@ export const router = createRouter({
       path: '/404',
       name: 'not-found',
       component: () => import('@/pages/errors/NotFoundPage.vue'),
-      meta: { access: 'public', title: '页面不存在' },
+      meta: {
+        access: 'public',
+        title: '页面不存在',
+        description: '当前 CodeNest 页面不存在或已经移动。',
+      },
     },
     {
       path: '/:pathMatch(.*)*',
@@ -223,4 +248,7 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to) => {
   setPageTitle(to.meta.title);
+  setPageDescription(
+    to.meta.description ?? 'CodeNest 技术社区，连接创作者、读者与高质量技术讨论。',
+  );
 });

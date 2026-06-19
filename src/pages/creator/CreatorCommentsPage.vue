@@ -70,9 +70,11 @@ onMounted(loadComments);
         <el-table-column label="时间" width="150">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" min-width="110">
           <template #default="{ row }">
-            <el-button text type="danger" @click="removeComment(row)">删除</el-button>
+            <div class="table-actions">
+              <el-button text type="danger" @click="removeComment(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -142,6 +144,16 @@ onMounted(loadComments);
 .comment-content span {
   margin-top: 4px;
   color: #667085;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-actions :deep(.el-button) {
+  margin-left: 0;
 }
 
 @media (max-width: 700px) {

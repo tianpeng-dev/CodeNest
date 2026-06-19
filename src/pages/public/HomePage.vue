@@ -816,15 +816,18 @@ onMounted(() => {
   }
 }
 
+@media (max-width: 768px) {
+  .home-page__left,
+  .home-page__right,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 560px) {
   .portal-surface,
   .side-section {
     padding: 12px;
-  }
-
-  .home-page__left,
-  .stats-grid {
-    grid-template-columns: 1fr;
   }
 
   .headline-block {

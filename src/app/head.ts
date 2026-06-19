@@ -3,7 +3,7 @@ const siteName = 'CodeNest';
 export function setPageTitle(title?: string) {
   if (typeof document === 'undefined') return;
 
-  document.title = title ? `${title} | ${siteName}` : siteName;
+  document.title = title ? `${title} - ${siteName}` : siteName;
 }
 
 export function setPageDescription(description: string) {

@@ -328,7 +328,7 @@ watch(
   background: transparent;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .post-detail-page {
     grid-template-columns: 1fr;
   }

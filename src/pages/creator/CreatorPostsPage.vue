@@ -108,20 +108,22 @@ onMounted(loadPosts);
         <el-table-column label="更新" width="130">
           <template #default="{ row }">{{ formatDate(row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" min-width="160">
           <template #default="{ row }">
-            <RouterLink v-if="row.status !== 'deleted'" :to="`/post/${row.id}`">
-              <el-button text :icon="View">查看</el-button>
-            </RouterLink>
-            <el-button
-              v-if="row.status !== 'deleted'"
-              text
-              type="danger"
-              :icon="Delete"
-              @click="removePost(row)"
-            >
-              删除
-            </el-button>
+            <div class="table-actions">
+              <RouterLink v-if="row.status !== 'deleted'" :to="`/post/${row.id}`">
+                <el-button text :icon="View">查看</el-button>
+              </RouterLink>
+              <el-button
+                v-if="row.status !== 'deleted'"
+                text
+                type="danger"
+                :icon="Delete"
+                @click="removePost(row)"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -225,6 +227,16 @@ onMounted(loadPosts);
   margin-top: 4px;
   color: #667085;
   font-size: 13px;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-actions :deep(.el-button) {
+  margin-left: 0;
 }
 
 @media (max-width: 700px) {

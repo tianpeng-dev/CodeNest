@@ -152,18 +152,20 @@ watch(
         </template>
       </el-table-column>
 
-      <el-table-column v-if="actions.length" label="操作" width="210" fixed="right">
+      <el-table-column v-if="actions.length" label="操作" min-width="210">
         <template #default="{ row }">
-          <el-button
-            v-for="action in actions"
-            :key="action.label"
-            size="small"
-            :type="action.type ?? 'primary'"
-            :disabled="action.disabled?.(row)"
-            @click="runAction(action, row)"
-          >
-            {{ action.label }}
-          </el-button>
+          <div class="admin-table-page__actions">
+            <el-button
+              v-for="action in actions"
+              :key="action.label"
+              size="small"
+              :type="action.type ?? 'primary'"
+              :disabled="action.disabled?.(row)"
+              @click="runAction(action, row)"
+            >
+              {{ action.label }}
+            </el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -214,6 +216,16 @@ watch(
 
 .admin-table-page__table {
   width: 100%;
+}
+
+.admin-table-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-table-page__actions :deep(.el-button) {
+  margin-left: 0;
 }
 
 .admin-table-page__footer {
