@@ -33,6 +33,7 @@ export interface Post {
 export interface PostQuery {
   keyword?: string;
   categoryId?: ID;
+  categorySlug?: string;
   authorId?: ID;
   tags?: string[];
   status?: PostStatus;

@@ -16,7 +16,7 @@ import StatCard from '@/components/StatCard.vue';
 import PostList from '@/modules/post/PostList.vue';
 import UserSummaryCard from '@/modules/user/UserSummaryCard.vue';
 import { getPosts } from '@/services/post.service';
-import type { Post } from '@/types/post';
+import type { Post, PostQuery } from '@/types/post';
 import type { User } from '@/types/user';
 
 interface CategoryFilter {
@@ -158,14 +158,14 @@ async function loadPosts() {
   posts.value = [];
   total.value = 0;
 
-  const query = {
+  const query: PostQuery = {
     page: page.value,
     pageSize,
     status: 'published',
     sortBy: 'latest',
     categorySlug:
       activeCategory.value === 'all' ? undefined : activeCategory.value,
-  } satisfies Parameters<typeof getPosts>[0] & { categorySlug?: string };
+  };
 
   try {
     const result = await getPosts(query);
