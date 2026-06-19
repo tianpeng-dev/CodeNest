@@ -26,6 +26,56 @@ describe('auth store', () => {
     expect(window.localStorage.getItem('codenest_token')).toBe('mock-token-admin');
   });
 
+  it('rejects invalid credentials with the service message', async () => {
+    const authStore = useAuthStore();
+
+    await expect(
+      authStore.login({ username: 'writer', password: 'wrong-password' }),
+    ).rejects.toThrow('用户名或密码错误');
+
+    expect(authStore.token).toBeNull();
+    expect(authStore.currentUser).toBeNull();
+  });
+
+  it('registers a new user and persists the session token', async () => {
+    const authStore = useAuthStore();
+
+    await authStore.register({
+      displayName: '新作者',
+      username: 'new-writer',
+      password: 'password123',
+    });
+
+    expect(authStore.token).toBe('mock-token-new-writer');
+    expect(authStore.currentUser?.username).toBe('new-writer');
+    expect(window.localStorage.getItem('codenest_token')).toBe('mock-token-new-writer');
+  });
+
+  it('rejects duplicate usernames with the service message', async () => {
+    const authStore = useAuthStore();
+
+    await expect(
+      authStore.register({
+        displayName: '重复用户',
+        username: 'writer',
+        password: 'password123',
+      }),
+    ).rejects.toThrow('用户名已存在');
+
+    expect(authStore.token).toBeNull();
+    expect(authStore.currentUser).toBeNull();
+  });
+
+  it('loads the current user from a valid token', async () => {
+    window.localStorage.setItem('codenest_token', 'mock-token-writer');
+    const authStore = useAuthStore();
+
+    await authStore.loadCurrentUser();
+
+    expect(authStore.currentUser?.username).toBe('chen-dev');
+    expect(authStore.isLoggedIn).toBe(true);
+  });
+
   it('logs out and clears auth state', async () => {
     const authStore = useAuthStore();
     await authStore.login({ username: 'admin', password: 'admin123' });
