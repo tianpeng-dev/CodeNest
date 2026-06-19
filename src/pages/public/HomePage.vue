@@ -20,7 +20,7 @@ import type { Post } from '@/types/post';
 import type { User } from '@/types/user';
 
 interface CategoryFilter {
-  id: string;
+  value: string;
   label: string;
   description: string;
 }
@@ -40,10 +40,14 @@ interface EventItem {
 }
 
 const categoryFilters: CategoryFilter[] = [
-  { id: 'all', label: '全部', description: '社区最新发布' },
-  { id: 'cat-frontend', label: '前端工程', description: 'Vue、构建与体验' },
-  { id: 'cat-backend', label: '后端架构', description: 'API、缓存与服务' },
-  { id: 'cat-growth', label: '社区运营', description: '增长、治理与数据' },
+  { value: 'all', label: '全部', description: '社区最新发布' },
+  { value: 'frontend', label: '前端工程', description: 'Vue、构建与体验' },
+  { value: 'backend', label: '后端架构', description: 'API、缓存与服务' },
+  {
+    value: 'community-growth',
+    label: '社区运营',
+    description: '增长、治理与数据',
+  },
 ];
 
 const leftMenu = [
@@ -108,10 +112,11 @@ const total = ref(0);
 const posts = ref<Post[]>([]);
 const loading = ref(false);
 const errorMessage = ref('');
+const requestSequence = ref(0);
 
 const activeCategoryInfo = computed(() => {
   return (
-    categoryFilters.find((category) => category.id === activeCategory.value) ??
+    categoryFilters.find((category) => category.value === activeCategory.value) ??
     categoryFilters[0]
   );
 });
@@ -146,28 +151,44 @@ function formatCount(value: number) {
 }
 
 async function loadPosts() {
+  const requestId = requestSequence.value + 1;
+  requestSequence.value = requestId;
   loading.value = true;
   errorMessage.value = '';
+  posts.value = [];
+  total.value = 0;
+
+  const query = {
+    page: page.value,
+    pageSize,
+    status: 'published',
+    sortBy: 'latest',
+    categorySlug:
+      activeCategory.value === 'all' ? undefined : activeCategory.value,
+  } satisfies Parameters<typeof getPosts>[0] & { categorySlug?: string };
 
   try {
-    const result = await getPosts({
-      page: page.value,
-      pageSize,
-      status: 'published',
-      sortBy: 'latest',
-      categoryId:
-        activeCategory.value === 'all' ? undefined : activeCategory.value,
-    });
+    const result = await getPosts(query);
+
+    if (requestId !== requestSequence.value) {
+      return;
+    }
 
     posts.value = result.items;
     total.value = result.total;
   } catch (error) {
+    if (requestId !== requestSequence.value) {
+      return;
+    }
+
     errorMessage.value =
       error instanceof Error ? error.message : '推荐内容加载失败';
     posts.value = [];
     total.value = 0;
   } finally {
-    loading.value = false;
+    if (requestId === requestSequence.value) {
+      loading.value = false;
+    }
   }
 }
 
@@ -235,8 +256,8 @@ onMounted(() => {
         >
           <el-radio-button
             v-for="category in categoryFilters"
-            :key="category.id"
-            :label="category.id"
+            :key="category.value"
+            :value="category.value"
           >
             {{ category.label }}
           </el-radio-button>
@@ -246,7 +267,8 @@ onMounted(() => {
       <section class="top-grid">
         <article class="portal-surface headline-block">
           <span class="section-kicker">头条</span>
-          <template v-if="headlinePost">
+          <el-skeleton v-if="loading" :rows="4" animated />
+          <template v-else-if="headlinePost">
             <RouterLink class="headline-block__title" :to="`/post/${headlinePost.id}`">
               {{ headlinePost.title }}
             </RouterLink>
@@ -258,15 +280,16 @@ onMounted(() => {
             </div>
           </template>
           <EmptyState
-            v-else-if="!loading"
+            v-else
             title="暂无头条"
             description="当前分类还没有已发布内容。"
           />
         </article>
 
         <section class="portal-surface carousel-block" aria-label="推荐轮播">
+          <el-skeleton v-if="loading" :rows="5" animated />
           <el-carousel
-            v-if="carouselPosts.length > 0"
+            v-else-if="carouselPosts.length > 0"
             height="210px"
             trigger="click"
             indicator-position="outside"
@@ -283,7 +306,7 @@ onMounted(() => {
             </el-carousel-item>
           </el-carousel>
           <EmptyState
-            v-else-if="!loading"
+            v-else
             title="暂无轮播内容"
             description="发布后的高质量帖子会出现在这里。"
           />
