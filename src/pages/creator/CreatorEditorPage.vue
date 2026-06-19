@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import EditorShell from '@/modules/editor/EditorShell.vue';
 import { useDraftStore } from '@/stores/draft.store';
-import { createDraft, publishPost } from '@/services/post.service';
-import type { PostDraftPayload } from '@/types/post';
+import { createDraft, publishPost, updatePost } from '@/services/post.service';
+import type { Post, PostDraftPayload } from '@/types/post';
 
 const router = useRouter();
 const draftStore = useDraftStore();
@@ -53,6 +53,24 @@ function validateDraft(payload: PostDraftPayload) {
   return true;
 }
 
+async function persistDraft(payload: PostDraftPayload): Promise<Post> {
+  const draftPayload: PostDraftPayload = {
+    ...payload,
+    status: 'draft',
+  };
+
+  if (draftStore.currentDraftId) {
+    const updated = await updatePost(draftStore.currentDraftId, draftPayload);
+    draftStore.replaceDraft(draftPayload);
+    return updated;
+  }
+
+  const created = await createDraft(draftPayload);
+  draftStore.setCurrentDraftId(created.id);
+  draftStore.replaceDraft(draftPayload);
+  return created;
+}
+
 async function saveDraft() {
   const payload = draftPayload('draft');
 
@@ -63,8 +81,7 @@ async function saveDraft() {
   saving.value = true;
 
   try {
-    await createDraft(payload);
-    draftStore.replaceDraft(payload);
+    await persistDraft(payload);
     ElMessage.success('草稿已保存');
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '草稿保存失败');
@@ -83,8 +100,14 @@ async function publishCurrentDraft() {
   publishing.value = true;
 
   try {
-    const created = await createDraft(payload);
-    const published = await publishPost(created.id);
+    await persistDraft(payload);
+    const postId = draftStore.currentDraftId;
+
+    if (!postId) {
+      throw new Error('草稿保存失败');
+    }
+
+    const published = await publishPost(postId);
     ElMessage.success('文章已发布');
     draftStore.resetDraft();
     await router.push({

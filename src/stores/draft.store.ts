@@ -19,6 +19,7 @@ export const useDraftStore = defineStore('draft', {
   state: () => ({
     draft: emptyDraft(),
     editingMode: 'markdown' as EditorMode,
+    currentDraftId: null as string | null,
   }),
   actions: {
     setField<K extends keyof DraftFields>(field: K, value: DraftFields[K]) {
@@ -33,9 +34,13 @@ export const useDraftStore = defineStore('draft', {
     setEditingMode(mode: EditorMode) {
       this.editingMode = mode;
     },
+    setCurrentDraftId(id: string | null) {
+      this.currentDraftId = id;
+    },
     resetDraft() {
       this.draft = emptyDraft();
       this.editingMode = 'markdown';
+      this.currentDraftId = null;
     },
   },
 });

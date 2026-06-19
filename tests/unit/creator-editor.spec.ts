@@ -6,16 +6,18 @@ import CreatorEditorPage from '@/pages/creator/CreatorEditorPage.vue';
 import { useDraftStore } from '@/stores/draft.store';
 import type { Post } from '@/types/post';
 
-const { createDraftMock, publishPostMock, pushMock, successMock } = vi.hoisted(() => ({
+const { createDraftMock, publishPostMock, pushMock, successMock, updatePostMock } = vi.hoisted(() => ({
   createDraftMock: vi.fn(),
   publishPostMock: vi.fn(),
   pushMock: vi.fn(),
   successMock: vi.fn(),
+  updatePostMock: vi.fn(),
 }));
 
 vi.mock('@/services/post.service', () => ({
   createDraft: createDraftMock,
   publishPost: publishPostMock,
+  updatePost: updatePostMock,
 }));
 
 vi.mock('vue-router', () => ({
@@ -144,6 +146,7 @@ describe('creator editor page', () => {
   beforeEach(() => {
     createDraftMock.mockReset();
     publishPostMock.mockReset();
+    updatePostMock.mockReset();
     pushMock.mockReset();
     successMock.mockReset();
     pinia = createPinia();
@@ -180,6 +183,36 @@ describe('creator editor page', () => {
     expect(wrapper.find('[data-testid="editor-shell"]').exists()).toBe(true);
   });
 
+  it('creates once and updates the saved draft on later saves', async () => {
+    createDraftMock.mockResolvedValueOnce(postFixture({ id: 'draft-001' }));
+    updatePostMock.mockResolvedValueOnce(postFixture({ id: 'draft-001' }));
+    const wrapper = mountPage();
+    const draftStore = useDraftStore();
+
+    draftStore.setField('title', '初版草稿');
+    draftStore.setField('summary', '初版摘要');
+    draftStore.setField('content', '初版正文');
+    draftStore.setField('categoryId', 'cat-frontend');
+    await nextTick();
+
+    await wrapper.find('[data-testid="save-draft"]').trigger('click');
+    draftStore.setField('summary', '更新后的摘要');
+    await nextTick();
+    await wrapper.find('[data-testid="save-draft"]').trigger('click');
+
+    expect(createDraftMock).toHaveBeenCalledTimes(1);
+    expect(updatePostMock).toHaveBeenCalledTimes(1);
+    expect(updatePostMock).toHaveBeenCalledWith(
+      'draft-001',
+      expect.objectContaining({
+        title: '初版草稿',
+        summary: '更新后的摘要',
+        status: 'draft',
+      }),
+    );
+    expect(draftStore.currentDraftId).toBe('draft-001');
+  });
+
   it('publishes by creating a draft, publishing it, and navigating to the post detail page', async () => {
     createDraftMock.mockResolvedValueOnce(postFixture({ id: 'post-draft' }));
     publishPostMock.mockResolvedValueOnce(
@@ -211,5 +244,41 @@ describe('creator editor page', () => {
       name: 'post-detail',
       params: { id: 'post-published' },
     });
+  });
+
+  it('publishes the same draft id after saving instead of creating a duplicate', async () => {
+    createDraftMock.mockResolvedValueOnce(postFixture({ id: 'draft-saved' }));
+    updatePostMock.mockResolvedValueOnce(postFixture({ id: 'draft-saved' }));
+    publishPostMock.mockResolvedValueOnce(
+      postFixture({
+        id: 'draft-saved',
+        status: 'published',
+        publishedAt: '2026-06-19T01:00:00.000Z',
+      }),
+    );
+    const wrapper = mountPage();
+    const draftStore = useDraftStore();
+
+    draftStore.setField('title', '先保存再发布');
+    draftStore.setField('summary', '保存摘要');
+    draftStore.setField('content', '保存正文');
+    draftStore.setField('categoryId', 'cat-frontend');
+    await nextTick();
+
+    await wrapper.find('[data-testid="save-draft"]').trigger('click');
+    draftStore.setField('content', '发布前更新正文');
+    await nextTick();
+    await wrapper.find('[data-testid="publish-post"]').trigger('click');
+
+    expect(createDraftMock).toHaveBeenCalledTimes(1);
+    expect(updatePostMock).toHaveBeenCalledWith(
+      'draft-saved',
+      expect.objectContaining({
+        content: '发布前更新正文',
+        status: 'draft',
+      }),
+    );
+    expect(publishPostMock).toHaveBeenCalledWith('draft-saved');
+    expect(draftStore.currentDraftId).toBeNull();
   });
 });
