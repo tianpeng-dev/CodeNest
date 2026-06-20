@@ -109,7 +109,9 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     CategoryEntity category = requireActiveCategory(request.categoryId());
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
-    assertPublishAllowed(status, request.title(), request.summary(), request.content());
+    SensitiveWordService.ScanResult scanResult =
+        scanPublishContent(status, request.title(), request.summary(), request.content());
+    sensitiveWordService.blockIfHigh(scanResult, "post", null, author.getId());
 
     LocalDateTime now = LocalDateTime.now();
     PostEntity post = new PostEntity();
@@ -130,6 +132,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     post.setUpdatedAt(now);
     save(post);
     replaceTags(post.getId(), request.tags(), now);
+    sensitiveWordService.recordHits(scanResult, "post", post.getId(), author.getId());
     return toDto(post);
   }
 
@@ -143,7 +146,10 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     String previousStatus = post.getStatus();
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
-    assertPublishAllowed(status, request.title(), request.summary(), request.content());
+    Long operatorId = currentUserProvider.requireCurrentUser().id();
+    SensitiveWordService.ScanResult scanResult =
+        scanPublishContent(status, request.title(), request.summary(), request.content());
+    sensitiveWordService.blockIfHigh(scanResult, "post", post.getId(), operatorId);
 
     post.setTitle(trimRequired(request.title(), "Title is required"));
     post.setSummary(defaultString(request.summary()));
@@ -159,6 +165,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     post.setUpdatedAt(LocalDateTime.now());
     updateById(post);
     replaceTags(post.getId(), request.tags(), LocalDateTime.now());
+    sensitiveWordService.recordHits(scanResult, "post", post.getId(), operatorId);
     return toDto(post);
   }
 
@@ -167,7 +174,10 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
     requireMutablePost(post);
-    sensitiveWordService.assertPublishAllowed(post.getTitle(), post.getSummary(), post.getContent());
+    Long operatorId = currentUserProvider.requireCurrentUser().id();
+    SensitiveWordService.ScanResult scanResult =
+        sensitiveWordService.scan(post.getTitle(), post.getSummary(), post.getContent());
+    sensitiveWordService.blockIfHigh(scanResult, "post", post.getId(), operatorId);
 
     LocalDateTime now = LocalDateTime.now();
     post.setStatus(STATUS_PUBLISHED);
@@ -176,6 +186,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     }
     post.setUpdatedAt(now);
     updateById(post);
+    sensitiveWordService.recordHits(scanResult, "post", post.getId(), operatorId);
     return toDto(post);
   }
 
@@ -529,10 +540,12 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     trimRequired(content, "Content is required");
   }
 
-  private void assertPublishAllowed(String status, String title, String summary, String content) {
+  private SensitiveWordService.ScanResult scanPublishContent(
+      String status, String title, String summary, String content) {
     if (STATUS_PUBLISHED.equals(status)) {
-      sensitiveWordService.assertPublishAllowed(title, summary, content);
+      return sensitiveWordService.scan(title, summary, content);
     }
+    return new SensitiveWordService.ScanResult("none", List.of());
   }
 
   private String trimRequired(String value, String message) {

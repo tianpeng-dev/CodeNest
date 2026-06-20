@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS favorites;
+DROP TABLE IF EXISTS sensitive_word_hits;
+DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS post_reactions;
 DROP TABLE IF EXISTS post_tags;
 DROP TABLE IF EXISTS posts;
@@ -87,6 +89,17 @@ CREATE TABLE favorites (
   CONSTRAINT uk_favorites UNIQUE (post_id, user_id)
 );
 
+CREATE TABLE comments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  author_id BIGINT NOT NULL,
+  content VARCHAR(2000) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'visible',
+  hidden_reason VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE sensitive_words (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   word VARCHAR(100) NOT NULL,
@@ -96,4 +109,15 @@ CREATE TABLE sensitive_words (
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
   CONSTRAINT uk_sensitive_words_word UNIQUE (word)
+);
+
+CREATE TABLE sensitive_word_hits (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  word_id BIGINT NOT NULL,
+  resource_type VARCHAR(40) NOT NULL,
+  resource_id BIGINT NULL,
+  user_id BIGINT NOT NULL,
+  level VARCHAR(20) NOT NULL,
+  snippet VARCHAR(300) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL
 );

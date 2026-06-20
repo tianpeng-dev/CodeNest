@@ -32,4 +32,13 @@ public interface PostMapper extends BaseMapper<PostEntity> {
       "UPDATE posts SET favorite_count = CASE WHEN favorite_count > 0 THEN favorite_count - 1 ELSE 0 END,"
           + " updated_at = CURRENT_TIMESTAMP WHERE id = #{postId}")
   int decrementFavoriteCount(@Param("postId") Long postId);
+
+  @Update(
+      "UPDATE posts SET comment_count = comment_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = #{postId}")
+  int incrementCommentCount(@Param("postId") Long postId);
+
+  @Update(
+      "UPDATE posts SET comment_count = CASE WHEN comment_count > 0 THEN comment_count - 1 ELSE 0 END,"
+          + " updated_at = CURRENT_TIMESTAMP WHERE id = #{postId}")
+  int decrementCommentCount(@Param("postId") Long postId);
 }

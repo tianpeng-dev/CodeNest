@@ -11,4 +11,8 @@ public class PermissionService {
   public boolean isModerator(CurrentUser user) {
     return user != null && "moderator".equals(user.role());
   }
+
+  public boolean isCategoryModerator(CurrentUser user, Long categoryId) {
+    return false;
+  }
 }
