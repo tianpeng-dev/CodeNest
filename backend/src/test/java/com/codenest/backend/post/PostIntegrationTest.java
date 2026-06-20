@@ -202,6 +202,60 @@ class PostIntegrationTest {
   }
 
   @Test
+  void softDeletedPostCannotBeUpdatedOrRepublishedThroughUpdate() throws Exception {
+    Long postId = insertPost(ownerId, categoryId, "Deleted post", "draft", 0, 0, 0);
+
+    mockMvc
+        .perform(delete("/posts/{id}", postId).with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            put("/posts/{id}", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Restored through update",
+                      "content": "This should not restore a deleted post",
+                      "categoryId": "%s",
+                      "status": "published"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    String status =
+        jdbcTemplate.queryForObject("SELECT status FROM posts WHERE id = ?", String.class, postId);
+    assertThat(status).isEqualTo("deleted");
+  }
+
+  @Test
+  void tagsAreNormalizedCaseInsensitively() throws Exception {
+    mockMvc
+        .perform(
+            post("/posts/drafts")
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Tag normalization",
+                      "content": "Tags should be stable",
+                      "categoryId": "%s",
+                      "tags": ["Java", "java", " JAVA "],
+                      "status": "draft"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.tags.length()").value(1))
+        .andExpect(jsonPath("$.data.tags[0]").value("java"));
+  }
+
+  @Test
   void likeAndDislikeToggleAndKeepCountersCorrect() throws Exception {
     Long postId = insertPost(ownerId, categoryId, "Reactable", "published", 0, 0, 0);
 
@@ -234,6 +288,30 @@ class PostIntegrationTest {
   }
 
   @Test
+  void likeRemovesExistingDislikeAndBoundsCounter() throws Exception {
+    Long postId = insertPost(ownerId, categoryId, "Existing dislike", "published", 0, 0, 0);
+    insertReaction(postId, otherId(), "dislike");
+
+    mockMvc
+        .perform(post("/posts/{id}/like", postId).with(jwt().jwt(jwt -> jwt.subject(OTHER_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.likeCount").value(1));
+
+    Integer dislikeCount =
+        jdbcTemplate.queryForObject(
+            "SELECT dislike_count FROM posts WHERE id = ?", Integer.class, postId);
+    assertThat(dislikeCount).isZero();
+
+    String reaction =
+        jdbcTemplate.queryForObject(
+            "SELECT reaction FROM post_reactions WHERE post_id = ? AND user_id = ?",
+            String.class,
+            postId,
+            otherId());
+    assertThat(reaction).isEqualTo("like");
+  }
+
+  @Test
   void favoriteTogglesAndKeepsCounterCorrect() throws Exception {
     Long postId = insertPost(ownerId, categoryId, "Favorite target", "published", 0, 0, 0);
 
@@ -250,6 +328,24 @@ class PostIntegrationTest {
                 .with(jwt().jwt(jwt -> jwt.subject(OTHER_CLERK_ID))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.favoriteCount").value(0));
+  }
+
+  @Test
+  void favoriteToggleDoesNotDriveCounterNegativeWhenExistingRowCounterIsStale() throws Exception {
+    Long postId = insertPost(ownerId, categoryId, "Favorite stale counter", "published", 0, 0, 0);
+    insertFavorite(postId, otherId());
+
+    mockMvc
+        .perform(
+            post("/posts/{id}/favorite", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(OTHER_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.favoriteCount").value(0));
+
+    Integer favoriteCount =
+        jdbcTemplate.queryForObject(
+            "SELECT favorite_count FROM posts WHERE id = ?", Integer.class, postId);
+    assertThat(favoriteCount).isZero();
   }
 
   private Long insertUser(String clerkUserId, String username, String displayName, String role) {
@@ -273,6 +369,11 @@ class PostIntegrationTest {
         role);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM users WHERE clerk_user_id = ?", Long.class, clerkUserId);
+  }
+
+  private Long otherId() {
+    return jdbcTemplate.queryForObject(
+        "SELECT id FROM users WHERE clerk_user_id = ?", Long.class, OTHER_CLERK_ID);
   }
 
   private Long insertCategory(String name, String slug) {
@@ -338,5 +439,28 @@ class PostIntegrationTest {
         "INSERT INTO post_tags (post_id, tag, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
         postId,
         tag);
+  }
+
+  private void insertReaction(Long postId, Long userId, String reaction) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO post_reactions (
+          post_id,
+          user_id,
+          reaction,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        postId,
+        userId,
+        reaction);
+  }
+
+  private void insertFavorite(Long postId, Long userId) {
+    jdbcTemplate.update(
+        "INSERT INTO favorites (post_id, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+        postId,
+        userId);
   }
 }

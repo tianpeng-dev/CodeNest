@@ -21,10 +21,12 @@ import com.codenest.backend.user.dto.UserDto;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -130,6 +132,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   public PostDto update(Long id, PostDraftRequest request) {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
+    requireNotDeleted(post);
     requireActiveCategory(request.categoryId());
 
     String previousStatus = post.getStatus();
@@ -200,14 +203,19 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
       created.setPostId(post.getId());
       created.setUserId(currentUser.id());
       created.setCreatedAt(LocalDateTime.now());
-      favoriteMapper.insert(created);
+      try {
+        favoriteMapper.insert(created);
+        baseMapper.incrementFavoriteCount(post.getId());
+      } catch (DuplicateKeyException exception) {
+        return toDto(requirePost(post.getId()));
+      }
     } else {
-      favoriteMapper.deleteById(favorite.getId());
+      if (favoriteMapper.deleteById(favorite.getId()) > 0) {
+        baseMapper.decrementFavoriteCount(post.getId());
+      }
     }
 
-    refreshFavoriteCount(post);
-    updateById(post);
-    return toDto(post);
+    return toDto(requirePost(post.getId()));
   }
 
   private PageResult<PostDto> listPosts(PostQuery query, Long forcedAuthorId, boolean publicOnly) {
@@ -246,21 +254,27 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
     PostReactionEntity reaction = findReaction(post.getId(), currentUser.id());
     if (reaction == null) {
-      createReaction(post.getId(), currentUser.id(), targetReaction);
+      if (createReaction(post.getId(), currentUser.id(), targetReaction)) {
+        incrementReactionCount(post.getId(), targetReaction);
+      }
     } else if (targetReaction.equals(reaction.getReaction())) {
-      postReactionMapper.deleteById(reaction.getId());
+      if (postReactionMapper.deleteById(reaction.getId()) > 0) {
+        decrementReactionCount(post.getId(), targetReaction);
+      }
     } else {
+      String previousReaction = reaction.getReaction();
       reaction.setReaction(targetReaction);
       reaction.setUpdatedAt(LocalDateTime.now());
-      postReactionMapper.updateById(reaction);
+      if (postReactionMapper.updateById(reaction) > 0) {
+        decrementReactionCount(post.getId(), previousReaction);
+        incrementReactionCount(post.getId(), targetReaction);
+      }
     }
 
-    refreshReactionCounts(post);
-    updateById(post);
-    return toDto(post);
+    return toDto(requirePost(post.getId()));
   }
 
-  private void createReaction(Long postId, Long userId, String reactionType) {
+  private boolean createReaction(Long postId, Long userId, String reactionType) {
     LocalDateTime now = LocalDateTime.now();
     PostReactionEntity reaction = new PostReactionEntity();
     reaction.setPostId(postId);
@@ -268,29 +282,27 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     reaction.setReaction(reactionType);
     reaction.setCreatedAt(now);
     reaction.setUpdatedAt(now);
-    postReactionMapper.insert(reaction);
+    try {
+      return postReactionMapper.insert(reaction) > 0;
+    } catch (DuplicateKeyException exception) {
+      return false;
+    }
   }
 
-  private void refreshReactionCounts(PostEntity post) {
-    post.setLikeCount(countReactions(post.getId(), REACTION_LIKE));
-    post.setDislikeCount(countReactions(post.getId(), REACTION_DISLIKE));
-    post.setUpdatedAt(LocalDateTime.now());
+  private void incrementReactionCount(Long postId, String reaction) {
+    if (REACTION_LIKE.equals(reaction)) {
+      baseMapper.incrementLikeCount(postId);
+      return;
+    }
+    baseMapper.incrementDislikeCount(postId);
   }
 
-  private int countReactions(Long postId, String reaction) {
-    return Math.toIntExact(
-        postReactionMapper.selectCount(
-            new LambdaQueryWrapper<PostReactionEntity>()
-                .eq(PostReactionEntity::getPostId, postId)
-                .eq(PostReactionEntity::getReaction, reaction)));
-  }
-
-  private void refreshFavoriteCount(PostEntity post) {
-    post.setFavoriteCount(
-        Math.toIntExact(
-            favoriteMapper.selectCount(
-                new LambdaQueryWrapper<FavoriteEntity>().eq(FavoriteEntity::getPostId, post.getId()))));
-    post.setUpdatedAt(LocalDateTime.now());
+  private void decrementReactionCount(Long postId, String reaction) {
+    if (REACTION_LIKE.equals(reaction)) {
+      baseMapper.decrementLikeCount(postId);
+      return;
+    }
+    baseMapper.decrementDislikeCount(postId);
   }
 
   private void replaceTags(Long postId, List<String> rawTags, LocalDateTime now) {
@@ -310,7 +322,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     }
     LinkedHashSet<String> tags = new LinkedHashSet<>();
     for (String rawTag : rawTags) {
-      String tag = trimToNull(rawTag);
+      String tag = normalizeTag(rawTag);
       if (tag != null) {
         if (tag.length() > 40) {
           throw new BusinessException(ErrorCode.BAD_REQUEST, "Tag is too long");
@@ -418,6 +430,12 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     return category;
   }
 
+  private void requireNotDeleted(PostEntity post) {
+    if (STATUS_DELETED.equals(post.getStatus())) {
+      throw new BusinessException(ErrorCode.BAD_REQUEST, "Deleted post cannot be updated");
+    }
+  }
+
   private void requireManagePermission(PostEntity post) {
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
     if (!canManage(post, currentUser)) {
@@ -521,6 +539,11 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String normalizeTag(String value) {
+    String tag = trimToNull(value);
+    return tag == null ? null : tag.toLowerCase(Locale.ROOT);
   }
 
   private boolean hasText(String value) {
