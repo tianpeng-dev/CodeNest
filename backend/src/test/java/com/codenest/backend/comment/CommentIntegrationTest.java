@@ -37,6 +37,8 @@ class CommentIntegrationTest {
   private static final String OWNER_CLERK_ID = "clerk_comment_owner";
   private static final String OTHER_CLERK_ID = "clerk_comment_other";
   private static final String ADMIN_CLERK_ID = "clerk_comment_admin";
+  private static final String MODERATOR_CLERK_ID = "clerk_comment_moderator";
+  private static final String UNASSIGNED_MODERATOR_CLERK_ID = "clerk_comment_unassigned_moderator";
   private static final String BANNED_CLERK_ID = "clerk_comment_banned";
   private static final String MUTED_CLERK_ID = "clerk_comment_muted";
 
@@ -49,6 +51,7 @@ class CommentIntegrationTest {
   private Long ownerId;
   private Long otherId;
   private Long adminId;
+  private Long moderatorId;
   private Long categoryId;
   private Long postId;
 
@@ -61,12 +64,21 @@ class CommentIntegrationTest {
     jdbcTemplate.update("DELETE FROM post_reactions");
     jdbcTemplate.update("DELETE FROM post_tags");
     jdbcTemplate.update("DELETE FROM posts");
+    jdbcTemplate.update("DELETE FROM category_moderators");
     jdbcTemplate.update("DELETE FROM categories");
     jdbcTemplate.update("DELETE FROM users");
 
     ownerId = insertUser(OWNER_CLERK_ID, "commentowner", "Comment Owner", "user", "active");
     otherId = insertUser(OTHER_CLERK_ID, "commentother", "Comment Other", "user", "active");
     adminId = insertUser(ADMIN_CLERK_ID, "commentadmin", "Comment Admin", "admin", "active");
+    moderatorId =
+        insertUser(MODERATOR_CLERK_ID, "commentmod", "Comment Moderator", "moderator", "active");
+    insertUser(
+        UNASSIGNED_MODERATOR_CLERK_ID,
+        "commentunassignedmod",
+        "Comment Unassigned Moderator",
+        "moderator",
+        "active");
     insertUser(BANNED_CLERK_ID, "commentbanned", "Comment Banned", "user", "banned");
     insertMutedUser();
     categoryId = insertCategory();
@@ -229,6 +241,62 @@ class CommentIntegrationTest {
     assertThat(remainingCount).isZero();
   }
 
+  @Test
+  void repeatedDeleteDoesNotDoubleDecrementPostCommentCount() throws Exception {
+    Long commentId =
+        insertComment(postId, otherId, "delete once", "visible", "2026-01-01 10:00:00");
+    jdbcTemplate.update("UPDATE posts SET comment_count = 1 WHERE id = ?", postId);
+
+    mockMvc
+        .perform(
+            delete("/comments/{id}", commentId)
+                .with(jwt().jwt(jwt -> jwt.subject(OTHER_CLERK_ID))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            delete("/comments/{id}", commentId)
+                .with(jwt().jwt(jwt -> jwt.subject(OTHER_CLERK_ID))))
+        .andExpect(status().isOk());
+
+    Integer commentCount =
+        jdbcTemplate.queryForObject(
+            "SELECT comment_count FROM posts WHERE id = ?", Integer.class, postId);
+    assertThat(commentCount).isZero();
+  }
+
+  @Test
+  void assignedCategoryModeratorCanDeleteCommentButUnassignedModeratorCannot() throws Exception {
+    Long assignedTargetId =
+        insertComment(postId, otherId, "moderated", "visible", "2026-01-01 10:00:00");
+    Long unassignedTargetId =
+        insertComment(postId, otherId, "not moderated", "visible", "2026-01-01 10:01:00");
+    insertCategoryModerator(categoryId, moderatorId, adminId);
+    jdbcTemplate.update("UPDATE posts SET comment_count = 2 WHERE id = ?", postId);
+
+    mockMvc
+        .perform(
+            delete("/comments/{id}", unassignedTargetId)
+                .with(jwt().jwt(jwt -> jwt.subject(UNASSIGNED_MODERATOR_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    mockMvc
+        .perform(
+            delete("/comments/{id}", assignedTargetId)
+                .with(jwt().jwt(jwt -> jwt.subject(MODERATOR_CLERK_ID))))
+        .andExpect(status().isOk());
+
+    String status =
+        jdbcTemplate.queryForObject(
+            "SELECT status FROM comments WHERE id = ?", String.class, assignedTargetId);
+    Integer commentCount =
+        jdbcTemplate.queryForObject(
+            "SELECT comment_count FROM posts WHERE id = ?", Integer.class, postId);
+    assertThat(status).isEqualTo("deleted");
+    assertThat(commentCount).isEqualTo(1);
+  }
+
   private Long insertUser(
       String clerkUserId, String username, String displayName, String role, String status) {
     jdbcTemplate.update(
@@ -276,6 +344,22 @@ class CommentIntegrationTest {
         ) VALUES ('Comments', 'comments', '', 1, 'active', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """);
     return jdbcTemplate.queryForObject("SELECT id FROM categories WHERE slug = 'comments'", Long.class);
+  }
+
+  private void insertCategoryModerator(Long categoryId, Long userId, Long assignedBy) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO category_moderators (
+          category_id,
+          user_id,
+          assigned_by,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        categoryId,
+        userId,
+        assignedBy);
   }
 
   private Long insertPost(Long authorId, String status, int commentCount) {

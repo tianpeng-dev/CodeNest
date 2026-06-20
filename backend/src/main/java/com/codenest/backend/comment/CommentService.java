@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
   private static final String POST_STATUS_PUBLISHED = "published";
   private static final String COMMENT_STATUS_VISIBLE = "visible";
-  private static final String COMMENT_STATUS_DELETED = "deleted";
   private static final String USER_STATUS_BANNED = "banned";
 
   private final PostMapper postMapper;
@@ -91,14 +90,9 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
     if (!canDelete(comment, post, currentUser)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "Forbidden");
     }
-    if (!COMMENT_STATUS_VISIBLE.equals(comment.getStatus())) {
-      return;
+    if (baseMapper.markDeletedIfVisible(comment.getId()) == 1) {
+      postMapper.decrementCommentCount(comment.getPostId());
     }
-
-    comment.setStatus(COMMENT_STATUS_DELETED);
-    comment.setUpdatedAt(LocalDateTime.now());
-    updateById(comment);
-    postMapper.decrementCommentCount(comment.getPostId());
   }
 
   private boolean canDelete(CommentEntity comment, PostEntity post, CurrentUser currentUser) {

@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS category_moderators;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS favorites;
 DROP TABLE IF EXISTS sensitive_word_hits;
@@ -41,6 +42,16 @@ CREATE TABLE categories (
   updated_at TIMESTAMP NOT NULL,
   CONSTRAINT uk_categories_name UNIQUE (name),
   CONSTRAINT uk_categories_slug UNIQUE (slug)
+);
+
+CREATE TABLE category_moderators (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  category_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  assigned_by BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_category_moderators UNIQUE (category_id, user_id)
 );
 
 CREATE TABLE posts (
