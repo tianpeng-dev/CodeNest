@@ -1,8 +1,10 @@
 package com.codenest.backend.common;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +13,8 @@ import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTest {
   private MockMvc mockMvc;
@@ -78,10 +83,21 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void mapsStaticResourceMissToNotFoundResponseContract() throws Exception {
+    mockMvc
+        .perform(get("/test/no-resource"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(40004))
+        .andExpect(jsonPath("$.message").value("Not found"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
   void mapsUnsupportedMethodToClientErrorResponseContract() throws Exception {
     mockMvc
         .perform(post("/test/business-error"))
         .andExpect(status().isMethodNotAllowed())
+        .andExpect(header().string(HttpHeaders.ALLOW, containsString("GET")))
         .andExpect(jsonPath("$.code").value(40000))
         .andExpect(jsonPath("$.message").value("Method not allowed"))
         .andExpect(jsonPath("$.data").value(nullValue()));
@@ -95,6 +111,11 @@ class GlobalExceptionHandlerTest {
     @GetMapping("/test/business-error")
     void businessError() {
       throw new BusinessException(ErrorCode.NOT_FOUND, "missing");
+    }
+
+    @GetMapping("/test/no-resource")
+    void noResource() throws NoResourceFoundException {
+      throw new NoResourceFoundException(HttpMethod.GET, "/static/missing.css");
     }
   }
 

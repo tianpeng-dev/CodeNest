@@ -1,7 +1,9 @@
 package com.codenest.backend.common;
 
 import jakarta.validation.ConstraintViolationException;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -37,8 +40,8 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.error(ErrorCode.BAD_REQUEST, BAD_REQUEST_MESSAGE));
   }
 
-  @ExceptionHandler(NoHandlerFoundException.class)
-  public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException exception) {
+  @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+  public ResponseEntity<ApiResponse<Void>> handleNotFound(Exception exception) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(ApiResponse.error(ErrorCode.NOT_FOUND, NOT_FOUND_MESSAGE));
   }
@@ -46,8 +49,12 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
       HttpRequestMethodNotSupportedException exception) {
-    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-        .body(ApiResponse.error(ErrorCode.BAD_REQUEST, METHOD_NOT_ALLOWED_MESSAGE));
+    Set<HttpMethod> supportedMethods = exception.getSupportedHttpMethods();
+    ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+    if (supportedMethods != null) {
+      responseBuilder.allow(supportedMethods.toArray(HttpMethod[]::new));
+    }
+    return responseBuilder.body(ApiResponse.error(ErrorCode.BAD_REQUEST, METHOD_NOT_ALLOWED_MESSAGE));
   }
 
   @ExceptionHandler(Exception.class)
