@@ -50,7 +50,7 @@ public class UploadController {
 
   @PostMapping(value = "/uploads/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ApiResponse<UploadResultDto> uploadImage(@RequestPart("file") MultipartFile file) {
-    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    CurrentUser currentUser = currentUserProvider.requireWritableCurrentUser();
     String contentType = validateImage(file);
     byte[] bytes = bytes(file);
     validateImageSignature(contentType, bytes);

@@ -84,7 +84,7 @@ public class MessageService extends ServiceImpl<MessageMapper, MessageEntity> {
 
   @Transactional
   public MessageDto send(Long participantId, SendMessageRequest request) {
-    Long currentUserId = currentUserProvider.requireCurrentUser().id();
+    Long currentUserId = currentUserProvider.requireWritableCurrentUser().id();
     requireParticipant(currentUserId, participantId);
     String content = trimRequired(request.content(), "Message content is required");
     SensitiveWordService.ScanResult scanResult = sensitiveWordService.scan(content);

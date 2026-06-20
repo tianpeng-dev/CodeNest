@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
   private static final String POST_STATUS_PUBLISHED = "published";
   private static final String COMMENT_STATUS_VISIBLE = "visible";
-  private static final String USER_STATUS_BANNED = "banned";
 
   private final PostMapper postMapper;
   private final UserMapper userMapper;
@@ -65,8 +64,7 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
   @Transactional
   public CommentDto create(Long postId, CreateCommentRequest request) {
     PostEntity post = requirePublishedPost(postId);
-    UserEntity author = currentUserProvider.requireCurrentUserEntity();
-    requireCanComment(author);
+    UserEntity author = currentUserProvider.requireWritableCurrentUserEntity();
 
     String content = trimRequired(request.content(), "Comment content is required");
     SensitiveWordService.ScanResult scanResult = sensitiveWordService.scan(content);
@@ -105,16 +103,6 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
         && (Objects.equals(comment.getAuthorId(), currentUser.id())
             || permissionService.isAdmin(currentUser)
             || permissionService.isCategoryModerator(currentUser, post.getCategoryId()));
-  }
-
-  private void requireCanComment(UserEntity user) {
-    if (USER_STATUS_BANNED.equals(user.getStatus())) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, "Forbidden");
-    }
-    LocalDateTime muteUntil = user.getMuteUntil();
-    if (muteUntil != null && muteUntil.isAfter(LocalDateTime.now())) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, "Forbidden");
-    }
   }
 
   private PostEntity requirePublishedPost(Long postId) {

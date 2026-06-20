@@ -38,6 +38,8 @@ class PostIntegrationTest {
   private static final String OWNER_CLERK_ID = "clerk_post_owner";
   private static final String OTHER_CLERK_ID = "clerk_post_other";
   private static final String ADMIN_CLERK_ID = "clerk_post_admin";
+  private static final String BANNED_CLERK_ID = "clerk_post_banned";
+  private static final String MUTED_CLERK_ID = "clerk_post_muted";
 
   @Autowired private MockMvc mockMvc;
 
@@ -63,6 +65,8 @@ class PostIntegrationTest {
     ownerId = insertUser(OWNER_CLERK_ID, "postowner", "Post Owner", "user");
     insertUser(OTHER_CLERK_ID, "postother", "Post Other", "user");
     insertUser(ADMIN_CLERK_ID, "postadmin", "Post Admin", "admin");
+    insertUser(BANNED_CLERK_ID, "postbanned", "Post Banned", "user", "banned", false);
+    insertUser(MUTED_CLERK_ID, "postmuted", "Post Muted", "user", "active", true);
     categoryId = insertCategory("Backend", "backend");
   }
 
@@ -504,7 +508,54 @@ class PostIntegrationTest {
     assertThat(favoriteCount).isZero();
   }
 
+  @Test
+  void bannedAndMutedUsersCannotWritePostsOrInteractions() throws Exception {
+    Long postId = insertPost(ownerId, categoryId, "Write guard target", "published", 0, 0, 0);
+
+    mockMvc
+        .perform(
+            post("/posts/drafts")
+                .with(jwt().jwt(jwt -> jwt.subject(BANNED_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Banned draft",
+                      "content": "Banned users should not write",
+                      "categoryId": "%s",
+                      "status": "draft"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    mockMvc
+        .perform(
+            post("/posts/{id}/like", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(MUTED_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    mockMvc
+        .perform(
+            post("/posts/{id}/favorite", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(BANNED_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+  }
+
   private Long insertUser(String clerkUserId, String username, String displayName, String role) {
+    return insertUser(clerkUserId, username, displayName, role, "active", false);
+  }
+
+  private Long insertUser(
+      String clerkUserId,
+      String username,
+      String displayName,
+      String role,
+      String status,
+      boolean muted) {
     jdbcTemplate.update(
         """
         INSERT INTO users (
@@ -515,14 +566,17 @@ class PostIntegrationTest {
           bio,
           role,
           status,
+          mute_until,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, '', '', ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, '', '', ?, ?, CASE WHEN ? THEN DATEADD('DAY', 1, CURRENT_TIMESTAMP) ELSE NULL END, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         clerkUserId,
         username,
         displayName,
-        role);
+        role,
+        status,
+        muted);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM users WHERE clerk_user_id = ?", Long.class, clerkUserId);
   }

@@ -1,6 +1,7 @@
 package com.codenest.backend.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.codenest.backend.admin.dto.AdminAnalyticsDto;
 import com.codenest.backend.admin.dto.AdminCountGroupDto;
 import com.codenest.backend.admin.dto.AdminMetricDto;
@@ -17,6 +18,7 @@ import com.codenest.backend.category.CategoryMapper;
 import com.codenest.backend.category.dto.CategoryDto;
 import com.codenest.backend.common.BusinessException;
 import com.codenest.backend.common.ErrorCode;
+import com.codenest.backend.common.PageResult;
 import com.codenest.backend.message.NotificationService;
 import com.codenest.backend.moderation.SensitiveWordEntity;
 import com.codenest.backend.moderation.SensitiveWordHitEntity;
@@ -27,6 +29,7 @@ import com.codenest.backend.post.PostMapper;
 import com.codenest.backend.post.PostTagEntity;
 import com.codenest.backend.post.PostTagMapper;
 import com.codenest.backend.post.dto.PostDto;
+import com.codenest.backend.post.dto.PostQuery;
 import com.codenest.backend.security.CurrentUser;
 import com.codenest.backend.security.CurrentUserProvider;
 import com.codenest.backend.user.UserEntity;
@@ -158,18 +161,49 @@ public class AdminService {
     return UserDto.from(user);
   }
 
-  public List<PostDto> posts() {
+  public PageResult<PostDto> posts(PostQuery postQuery) {
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
     LambdaQueryWrapper<PostEntity> query =
-        new LambdaQueryWrapper<PostEntity>().orderByDesc(PostEntity::getUpdatedAt).orderByDesc(PostEntity::getId);
+        new LambdaQueryWrapper<PostEntity>()
+            .orderByDesc(PostEntity::getUpdatedAt)
+            .orderByDesc(PostEntity::getId);
     if (ROLE_MODERATOR.equals(currentUser.role())) {
       List<Long> categoryIds = moderatorMapper.selectCategoryIdsByUserId(currentUser.id());
       if (categoryIds.isEmpty()) {
-        return List.of();
+        return new PageResult<>(
+            List.of(), 0, postQuery.normalizedPage(), postQuery.normalizedPageSize());
       }
       query.in(PostEntity::getCategoryId, categoryIds);
     }
-    return postMapper.selectList(query).stream().map(this::toPostDto).toList();
+    if (postQuery.status() != null && !postQuery.status().isBlank()) {
+      query.eq(PostEntity::getStatus, postQuery.status().trim());
+    }
+    if (postQuery.categoryId() != null) {
+      query.eq(PostEntity::getCategoryId, postQuery.categoryId());
+    }
+    if (postQuery.authorId() != null) {
+      query.eq(PostEntity::getAuthorId, postQuery.authorId());
+    }
+    if (postQuery.keyword() != null && !postQuery.keyword().isBlank()) {
+      String keyword = postQuery.keyword().trim();
+      query.and(
+          nested ->
+              nested
+                  .like(PostEntity::getTitle, keyword)
+                  .or()
+                  .like(PostEntity::getSummary, keyword)
+                  .or()
+                  .like(PostEntity::getContent, keyword));
+    }
+
+    Page<PostEntity> page =
+        new Page<>(postQuery.normalizedPage(), postQuery.normalizedPageSize());
+    Page<PostEntity> result = postMapper.selectPage(page, query);
+    return new PageResult<>(
+        result.getRecords().stream().map(this::toPostDto).toList(),
+        result.getTotal(),
+        postQuery.normalizedPage(),
+        postQuery.normalizedPageSize());
   }
 
   @Transactional

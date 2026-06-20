@@ -39,6 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
     })
 class UploadIntegrationTest {
   private static final String CLERK_ID = "clerk_upload_owner";
+  private static final String BANNED_CLERK_ID = "clerk_upload_banned";
 
   @Autowired private MockMvc mockMvc;
 
@@ -81,6 +82,23 @@ class UploadIntegrationTest {
             MediaType.IMAGE_PNG_VALUE,
             file.getSize());
     assertThat(count).isEqualTo(1);
+  }
+
+  @Test
+  void bannedUserCannotUpload() throws Exception {
+    insertUser(BANNED_CLERK_ID, "banned");
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", MediaType.IMAGE_PNG_VALUE, validPngBytes());
+
+    mockMvc
+        .perform(
+            multipart("/uploads/images")
+                .file(file)
+                .with(jwt().jwt(jwt -> jwt.subject(BANNED_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    assertThat(storageService.callCount).isZero();
   }
 
   @Test
@@ -185,5 +203,26 @@ class UploadIntegrationTest {
     return new byte[] {
       (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00
     };
+  }
+
+  private void insertUser(String clerkUserId, String status) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO users (
+          clerk_user_id,
+          username,
+          display_name,
+          avatar_url,
+          bio,
+          role,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, '', '', 'user', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        clerkUserId,
+        clerkUserId,
+        clerkUserId,
+        status);
   }
 }

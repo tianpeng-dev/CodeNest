@@ -36,6 +36,8 @@ class SocialMessageIntegrationTest {
   private static final String ALICE_CLERK_ID = "clerk_social_alice";
   private static final String BOB_CLERK_ID = "clerk_social_bob";
   private static final String CAROL_CLERK_ID = "clerk_social_carol";
+  private static final String BANNED_CLERK_ID = "clerk_social_banned";
+  private static final String MUTED_CLERK_ID = "clerk_social_muted";
 
   @Autowired private MockMvc mockMvc;
 
@@ -68,6 +70,8 @@ class SocialMessageIntegrationTest {
     aliceId = insertUser(ALICE_CLERK_ID, "socialalice", "Social Alice");
     bobId = insertUser(BOB_CLERK_ID, "socialbob", "Social Bob");
     carolId = insertUser(CAROL_CLERK_ID, "socialcarol", "Social Carol");
+    insertUser(BANNED_CLERK_ID, "socialbanned", "Social Banned", "banned", false);
+    insertUser(MUTED_CLERK_ID, "socialmuted", "Social Muted", "active", true);
     categoryId = insertCategory();
     alicePostId = insertPost(aliceId);
   }
@@ -280,7 +284,31 @@ class SocialMessageIntegrationTest {
     assertThat(hits).isEqualTo(1);
   }
 
+  @Test
+  void bannedAndMutedUsersCannotFollowOrMessage() throws Exception {
+    mockMvc
+        .perform(
+            post("/users/{id}/follow", aliceId)
+                .with(jwt().jwt(jwt -> jwt.subject(BANNED_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    mockMvc
+        .perform(
+            post("/messages/threads/{threadId}", aliceId)
+                .with(jwt().jwt(jwt -> jwt.subject(MUTED_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"Muted message\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+  }
+
   private Long insertUser(String clerkUserId, String username, String displayName) {
+    return insertUser(clerkUserId, username, displayName, "active", false);
+  }
+
+  private Long insertUser(
+      String clerkUserId, String username, String displayName, String status, boolean muted) {
     jdbcTemplate.update(
         """
         INSERT INTO users (
@@ -291,13 +319,16 @@ class SocialMessageIntegrationTest {
           bio,
           role,
           status,
+          mute_until,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, '', '', 'user', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, '', '', 'user', ?, CASE WHEN ? THEN DATEADD('DAY', 1, CURRENT_TIMESTAMP) ELSE NULL END, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         clerkUserId,
         username,
-        displayName);
+        displayName,
+        status,
+        muted);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM users WHERE clerk_user_id = ?", Long.class, clerkUserId);
   }

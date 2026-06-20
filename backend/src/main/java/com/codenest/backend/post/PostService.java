@@ -105,7 +105,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
 
   @Transactional
   public PostDto create(PostDraftRequest request) {
-    UserEntity author = currentUserProvider.requireCurrentUserEntity();
+    UserEntity author = currentUserProvider.requireWritableCurrentUserEntity();
     CategoryEntity category = requireActiveCategory(request.categoryId());
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
@@ -146,7 +146,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     String previousStatus = post.getStatus();
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
-    Long operatorId = currentUserProvider.requireCurrentUser().id();
+    Long operatorId = currentUserProvider.requireWritableCurrentUser().id();
     SensitiveWordService.ScanResult scanResult =
         scanPublishContent(status, request.title(), request.summary(), request.content());
     sensitiveWordService.blockIfHigh(scanResult, "post", post.getId(), operatorId);
@@ -174,7 +174,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
     requireMutablePost(post);
-    Long operatorId = currentUserProvider.requireCurrentUser().id();
+    Long operatorId = currentUserProvider.requireWritableCurrentUser().id();
     SensitiveWordService.ScanResult scanResult =
         sensitiveWordService.scan(post.getTitle(), post.getSummary(), post.getContent());
     sensitiveWordService.blockIfHigh(scanResult, "post", post.getId(), operatorId);
@@ -213,7 +213,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   @Transactional
   public PostDto toggleFavorite(Long id) {
     PostEntity post = requirePublishedPost(id);
-    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    CurrentUser currentUser = currentUserProvider.requireWritableCurrentUser();
     FavoriteEntity favorite = findFavorite(post.getId(), currentUser.id());
     if (favorite == null) {
       FavoriteEntity created = new FavoriteEntity();
@@ -268,7 +268,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
 
   private PostDto toggleReaction(Long id, String targetReaction) {
     PostEntity post = requirePublishedPost(id);
-    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    CurrentUser currentUser = currentUserProvider.requireWritableCurrentUser();
     PostReactionEntity reaction = findReaction(post.getId(), currentUser.id());
     if (reaction == null) {
       if (createReaction(post.getId(), currentUser.id(), targetReaction)) {
@@ -456,7 +456,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   }
 
   private void requireManagePermission(PostEntity post) {
-    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    CurrentUser currentUser = currentUserProvider.requireWritableCurrentUser();
     if (!canManage(post, currentUser)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, "Forbidden");
     }

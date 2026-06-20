@@ -67,6 +67,11 @@ class UploadControllerCleanupTest {
     public CurrentUser requireCurrentUser() {
       return new CurrentUser(123L, "clerk_cleanup", "cleanup", "user", "active");
     }
+
+    @Override
+    public CurrentUser requireWritableCurrentUser() {
+      return requireCurrentUser();
+    }
   }
 
   private static class RecordingStorageService implements StorageService {

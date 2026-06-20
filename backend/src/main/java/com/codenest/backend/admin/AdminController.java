@@ -9,7 +9,9 @@ import com.codenest.backend.admin.dto.AdminUserStatusRequest;
 import com.codenest.backend.admin.dto.SensitiveWordDto;
 import com.codenest.backend.admin.dto.SensitiveWordRequest;
 import com.codenest.backend.common.ApiResponse;
+import com.codenest.backend.common.PageResult;
 import com.codenest.backend.post.dto.PostDto;
+import com.codenest.backend.post.dto.PostQuery;
 import com.codenest.backend.user.dto.UserDto;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -47,8 +49,8 @@ public class AdminController {
   }
 
   @GetMapping("/admin/posts")
-  public ApiResponse<List<PostDto>> posts() {
-    return ApiResponse.ok(adminService.posts());
+  public ApiResponse<PageResult<PostDto>> posts(PostQuery query) {
+    return ApiResponse.ok(adminService.posts(query));
   }
 
   @PatchMapping("/admin/posts/{id}/status")

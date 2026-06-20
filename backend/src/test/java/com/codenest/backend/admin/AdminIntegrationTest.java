@@ -175,8 +175,9 @@ class AdminIntegrationTest {
     mockMvc
         .perform(get("/admin/posts").with(jwt().jwt(jwt -> jwt.subject(MODERATOR_CLERK_ID))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.length()").value(1))
-        .andExpect(jsonPath("$.data[0].id").value(String.valueOf(assignedPostId)));
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(assignedPostId)));
 
     mockMvc
         .perform(
@@ -209,6 +210,26 @@ class AdminIntegrationTest {
             Integer.class,
             userId);
     assertThat(notifications).isEqualTo(1);
+  }
+
+  @Test
+  void adminPostsReturnPageResult() throws Exception {
+    Long categoryId = insertCategory("Paged Posts", "paged-posts");
+    insertPost(userId, categoryId, "First page item", "published");
+    insertPost(userId, categoryId, "Second page item", "hidden");
+
+    mockMvc
+        .perform(
+            get("/admin/posts")
+                .param("page", "1")
+                .param("pageSize", "1")
+                .with(jwt().jwt(jwt -> jwt.subject(ADMIN_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(2))
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.pageSize").value(1))
+        .andExpect(jsonPath("$.data.items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].title").value("Second page item"));
   }
 
   @Test

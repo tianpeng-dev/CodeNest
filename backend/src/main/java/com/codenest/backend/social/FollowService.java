@@ -31,7 +31,7 @@ public class FollowService extends ServiceImpl<FollowMapper, FollowEntity> {
 
   @Transactional
   public UserDto toggleFollow(Long targetUserId) {
-    UserEntity follower = currentUserProvider.requireCurrentUserEntity();
+    UserEntity follower = currentUserProvider.requireWritableCurrentUserEntity();
     if (follower.getId().equals(targetUserId)) {
       throw new BusinessException(ErrorCode.BAD_REQUEST, "Cannot follow yourself");
     }
