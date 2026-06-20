@@ -24,7 +24,6 @@ import type { User } from '@/types/user';
 interface CategoryFilter {
   value: string;
   label: string;
-  description: string;
 }
 
 interface CommunityAction {
@@ -42,14 +41,23 @@ interface EventItem {
 }
 
 const categoryFilters: CategoryFilter[] = [
-  { value: 'all', label: '全部', description: '社区最新发布' },
-  { value: 'frontend', label: '前端工程', description: 'Vue、构建与体验' },
-  { value: 'backend', label: '后端架构', description: 'API、缓存与服务' },
-  {
-    value: 'community-growth',
-    label: '社区运营',
-    description: '增长、治理与数据',
-  },
+  { value: 'all', label: '全部' },
+  { value: 'news', label: '资讯' },
+  { value: 'openclaw', label: 'OpenClaw' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'mcp', label: 'MCP' },
+  { value: 'ops', label: '运维' },
+  { value: 'os', label: '操作系统' },
+  { value: 'ai', label: '人工智能' },
+  { value: 'java', label: 'Java' },
+  { value: 'moonbit', label: 'MoonBit' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'python', label: 'Python' },
+  { value: 'algorithm', label: '数据结构与算法' },
+  { value: 'frontend', label: '前端' },
+  { value: 'backend', label: '后端' },
+  { value: 'harmonyos', label: 'HarmonyOS' },
+  { value: 'ai-builder', label: 'AI开发者构建专区' },
 ];
 
 const leftMenu = [
@@ -116,13 +124,6 @@ const loading = ref(false);
 const errorMessage = ref('');
 const requestSequence = ref(0);
 const isSidebarCollapsed = ref(false);
-
-const activeCategoryInfo = computed(() => {
-  return (
-    categoryFilters.find((category) => category.value === activeCategory.value) ??
-    categoryFilters[0]
-  );
-});
 
 const headlinePost = computed(() => posts.value[0] ?? null);
 const carouselPosts = computed(() => posts.value.slice(0, 3));
@@ -201,6 +202,15 @@ function handleCategoryChange() {
   loadPosts();
 }
 
+function selectCategory(nextCategory: string) {
+  if (activeCategory.value === nextCategory) {
+    return;
+  }
+
+  activeCategory.value = nextCategory;
+  handleCategoryChange();
+}
+
 function handlePageChange(nextPage: number) {
   page.value = nextPage;
   loadPosts();
@@ -277,25 +287,20 @@ onMounted(() => {
     </aside>
 
     <main class="home-page__main">
-      <section class="portal-surface category-strip" aria-label="分类筛选">
-        <div>
-          <span class="section-kicker">频道</span>
-          <h1>{{ activeCategoryInfo.label }}</h1>
-          <p>{{ activeCategoryInfo.description }}</p>
-        </div>
-        <el-radio-group
-          v-model="activeCategory"
-          class="category-strip__filters"
-          @change="handleCategoryChange"
-        >
-          <el-radio-button
+      <section class="category-strip" aria-label="分类筛选">
+        <div class="category-strip__scroller">
+          <button
             v-for="category in categoryFilters"
             :key="category.value"
-            :value="category.value"
+            class="category-chip"
+            :class="{ 'category-chip--active': activeCategory === category.value }"
+            type="button"
+            :aria-pressed="activeCategory === category.value"
+            @click="selectCategory(category.value)"
           >
             {{ category.label }}
-          </el-radio-button>
-        </el-radio-group>
+          </button>
+        </div>
       </section>
 
       <section v-if="isAllCategory" class="top-grid">
@@ -528,8 +533,7 @@ onMounted(() => {
 }
 
 .side-section h2,
-.section-header h2,
-.category-strip h1 {
+.section-header h2 {
   margin: 0;
   color: #172033;
 }
@@ -601,27 +605,58 @@ onMounted(() => {
 }
 
 .category-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.category-strip__scroller {
+  display: flex;
   align-items: center;
   gap: 14px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  scrollbar-width: none;
 }
 
-.category-strip h1 {
-  margin-top: 2px;
-  font-size: 24px;
+.category-strip__scroller::-webkit-scrollbar {
+  display: none;
 }
 
-.category-strip p {
-  margin: 4px 0 0;
-  color: #667085;
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 56px;
+  height: 32px;
+  padding: 0 16px;
+  color: #1f2937;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  background: #f3f4f6;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
 }
 
-.category-strip__filters {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
+.category-chip:hover {
+  color: #111827;
+  background: #e8edf4;
+}
+
+.category-chip--active,
+.category-chip--active:hover {
+  color: #ffffff;
+  background: #050505;
 }
 
 .top-grid {
@@ -902,12 +937,8 @@ onMounted(() => {
     grid-column: 1 / -1;
   }
 
-  .category-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .category-strip__filters {
-    justify-content: flex-start;
+  .category-strip__scroller {
+    gap: 10px;
   }
 
   .stats-grid {

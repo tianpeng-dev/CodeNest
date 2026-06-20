@@ -10,7 +10,7 @@ const homePageSource = () => {
 };
 
 describe('home page filtering', () => {
-  it('uses slug filters, current radio value API, and latest-request guards', () => {
+  it('uses slug filters, category chips, and latest-request guards', () => {
     const source = homePageSource();
 
     expect(source).toContain('categorySlug');
@@ -21,7 +21,11 @@ describe('home page filtering', () => {
     expect(source).toContain('function toggleSidebar()');
     expect(source).toContain("'home-page--sidebar-collapsed': isSidebarCollapsed");
     expect(source).toContain("isSidebarCollapsed ? '展开左侧主菜单' : '折叠左侧主菜单'");
-    expect(source).toContain(':value="category.value"');
+    expect(source).toContain('function selectCategory(nextCategory: string)');
+    expect(source).toContain('class="category-chip"');
+    expect(source).toContain("'category-chip--active': activeCategory === category.value");
+    expect(source).toContain(':aria-pressed="activeCategory === category.value"');
+    expect(source).not.toContain('el-radio-button');
     expect(source).not.toContain(':label="category.id"');
     expect(source).not.toContain("categoryId:");
     expect(source).not.toContain("id: 'cat-");
