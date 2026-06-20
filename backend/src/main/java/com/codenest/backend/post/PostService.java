@@ -263,9 +263,9 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
       }
     } else {
       String previousReaction = reaction.getReaction();
-      reaction.setReaction(targetReaction);
-      reaction.setUpdatedAt(LocalDateTime.now());
-      if (postReactionMapper.updateById(reaction) > 0) {
+      if (postReactionMapper.updateReactionIfCurrent(
+              post.getId(), currentUser.id(), previousReaction, targetReaction)
+          > 0) {
         decrementReactionCount(post.getId(), previousReaction);
         incrementReactionCount(post.getId(), targetReaction);
       }

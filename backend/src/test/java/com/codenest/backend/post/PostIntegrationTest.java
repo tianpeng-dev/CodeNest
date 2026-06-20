@@ -45,6 +45,8 @@ class PostIntegrationTest {
 
   @Autowired private ObjectMapper objectMapper;
 
+  @Autowired private PostReactionMapper postReactionMapper;
+
   private Long ownerId;
   private Long categoryId;
 
@@ -309,6 +311,29 @@ class PostIntegrationTest {
             postId,
             otherId());
     assertThat(reaction).isEqualTo("like");
+  }
+
+  @Test
+  void conditionalReactionSwitchDoesNotUpdateStaleReaction() {
+    Long postId = insertPost(ownerId, categoryId, "Stale reaction switch", "published", 0, 0, 0);
+    Long userId = otherId();
+    insertReaction(postId, userId, "like");
+
+    int staleUpdated =
+        postReactionMapper.updateReactionIfCurrent(postId, userId, "dislike", "like");
+    assertThat(staleUpdated).isZero();
+
+    String reaction =
+        jdbcTemplate.queryForObject(
+            "SELECT reaction FROM post_reactions WHERE post_id = ? AND user_id = ?",
+            String.class,
+            postId,
+            userId);
+    assertThat(reaction).isEqualTo("like");
+
+    int currentUpdated =
+        postReactionMapper.updateReactionIfCurrent(postId, userId, "like", "dislike");
+    assertThat(currentUpdated).isEqualTo(1);
   }
 
   @Test
