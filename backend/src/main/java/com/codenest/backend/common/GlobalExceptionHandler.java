@@ -2,10 +2,13 @@ package com.codenest.backend.common;
 
 import jakarta.validation.ConstraintViolationException;
 import java.util.Set;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -32,6 +35,7 @@ public class GlobalExceptionHandler {
     MethodArgumentNotValidException.class,
     BindException.class,
     ConstraintViolationException.class,
+    HttpMessageNotReadableException.class,
     MissingServletRequestParameterException.class,
     MethodArgumentTypeMismatchException.class
   })
@@ -59,6 +63,25 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Void>> handleException(Exception exception) {
+    if (exception instanceof ErrorResponse errorResponse) {
+      return handleErrorResponse(errorResponse);
+    }
+
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(ApiResponse.error(ErrorCode.SERVER_ERROR, SERVER_ERROR_MESSAGE));
+  }
+
+  private ResponseEntity<ApiResponse<Void>> handleErrorResponse(ErrorResponse errorResponse) {
+    HttpStatusCode statusCode = errorResponse.getStatusCode();
+    if (statusCode.is4xxClientError()) {
+      ErrorCode errorCode =
+          statusCode.value() == HttpStatus.NOT_FOUND.value()
+              ? ErrorCode.NOT_FOUND
+              : ErrorCode.BAD_REQUEST;
+      String message = errorCode == ErrorCode.NOT_FOUND ? NOT_FOUND_MESSAGE : BAD_REQUEST_MESSAGE;
+      return ResponseEntity.status(statusCode).body(ApiResponse.error(errorCode, message));
+    }
+
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(ApiResponse.error(ErrorCode.SERVER_ERROR, SERVER_ERROR_MESSAGE));
   }

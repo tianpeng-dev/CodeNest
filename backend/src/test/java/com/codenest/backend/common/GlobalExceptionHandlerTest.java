@@ -103,6 +103,32 @@ class GlobalExceptionHandlerTest {
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
+  @Test
+  void mapsMalformedJsonToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Bad request"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsUnsupportedContentTypeToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(
+            post("/test/validate")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content("name=nest"))
+        .andExpect(status().isUnsupportedMediaType())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Bad request"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
   @RestController
   static class TestController {
     @PostMapping("/test/validate")
