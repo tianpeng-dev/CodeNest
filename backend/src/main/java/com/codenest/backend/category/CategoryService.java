@@ -2,6 +2,7 @@ package com.codenest.backend.category;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.codenest.backend.admin.AdminService;
 import com.codenest.backend.category.dto.CategoryDto;
 import com.codenest.backend.category.dto.CreateCategoryRequest;
 import com.codenest.backend.category.dto.UpdateCategoryRequest;
@@ -9,6 +10,7 @@ import com.codenest.backend.common.BusinessException;
 import com.codenest.backend.common.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class CategoryService extends ServiceImpl<CategoryMapper, CategoryEntity> {
   private static final String ACTIVE_STATUS = "active";
   private static final String DISABLED_STATUS = "disabled";
+
+  private final AdminService adminService;
+
+  public CategoryService(AdminService adminService) {
+    this.adminService = adminService;
+  }
 
   public List<CategoryDto> listActive() {
     return list(baseQuery().eq(CategoryEntity::getStatus, ACTIVE_STATUS)).stream()
@@ -49,6 +57,11 @@ public class CategoryService extends ServiceImpl<CategoryMapper, CategoryEntity>
     } catch (DuplicateKeyException exception) {
       throw duplicateSlugException();
     }
+    adminService.auditCurrent(
+        "category.create",
+        "category",
+        category.getId(),
+        Map.of("name", category.getName(), "slug", category.getSlug(), "status", category.getStatus()));
     return CategoryDto.from(category);
   }
 
@@ -70,6 +83,11 @@ public class CategoryService extends ServiceImpl<CategoryMapper, CategoryEntity>
     } catch (DuplicateKeyException exception) {
       throw duplicateSlugException();
     }
+    adminService.auditCurrent(
+        "category.update",
+        "category",
+        category.getId(),
+        Map.of("name", category.getName(), "slug", category.getSlug(), "status", category.getStatus()));
     return CategoryDto.from(category);
   }
 
@@ -80,10 +98,20 @@ public class CategoryService extends ServiceImpl<CategoryMapper, CategoryEntity>
       category.setStatus(DISABLED_STATUS);
       category.setUpdatedAt(LocalDateTime.now());
       updateById(category);
+      adminService.auditCurrent(
+          "category.disable",
+          "category",
+          category.getId(),
+          Map.of("slug", category.getSlug(), "postCount", defaultInt(category.getPostCount())));
       return;
     }
 
     removeById(id);
+    adminService.auditCurrent(
+        "category.delete",
+        "category",
+        id,
+        Map.of("slug", category.getSlug(), "postCount", defaultInt(category.getPostCount())));
   }
 
   private CategoryEntity requireCategory(Long id) {

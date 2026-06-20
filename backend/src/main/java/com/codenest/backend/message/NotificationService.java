@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService extends ServiceImpl<NotificationMapper, NotificationEntity> {
   private static final String TYPE_COMMENT = "comment";
   private static final String TYPE_FOLLOW = "follow";
+  private static final String TYPE_MODERATION = "moderation";
 
   private final CurrentUserProvider currentUserProvider;
 
@@ -69,6 +70,14 @@ public class NotificationService extends ServiceImpl<NotificationMapper, Notific
         TYPE_COMMENT,
         "New comment",
         commenter.getDisplayName() + " commented on your post: " + postTitle);
+  }
+
+  public void createPostHiddenNotification(UserEntity postAuthor, String postTitle) {
+    create(
+        postAuthor.getId(),
+        TYPE_MODERATION,
+        "Post hidden",
+        "Your post was hidden by moderation: " + postTitle);
   }
 
   private void create(Long userId, String type, String title, String content) {

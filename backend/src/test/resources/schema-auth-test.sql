@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS category_moderators;
+DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS file_objects;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS favorites;
@@ -161,6 +162,16 @@ CREATE TABLE sensitive_word_hits (
   user_id BIGINT NOT NULL,
   level VARCHAR(20) NOT NULL,
   snippet VARCHAR(300) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE audit_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  operator_id BIGINT NOT NULL,
+  action VARCHAR(80) NOT NULL,
+  resource_type VARCHAR(40) NOT NULL,
+  resource_id BIGINT NOT NULL,
+  detail_json CLOB NULL,
   created_at TIMESTAMP NOT NULL
 );
 

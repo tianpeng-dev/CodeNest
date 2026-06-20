@@ -142,6 +142,7 @@ class AuthIntegrationTest {
                                 jwt.subject("clerk_user_admin")
                                     .claim("username", "localadmin")
                                     .claim("name", "Local Admin"))))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0));
   }
 }
