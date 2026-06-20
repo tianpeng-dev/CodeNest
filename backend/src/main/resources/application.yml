@@ -1,0 +1,34 @@
+server:
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: codenest-backend
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:codenest}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+    username: ${MYSQL_USERNAME:codenest}
+    password: ${MYSQL_PASSWORD:codenest}
+  flyway:
+    enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${CLERK_ISSUER:}
+          jwk-set-uri: ${CLERK_JWKS_URI:}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+codenest:
+  storage:
+    endpoint: ${S3_ENDPOINT:}
+    region: ${S3_REGION:us-east-1}
+    bucket: ${S3_BUCKET:codenest-dev}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    public-base-url: ${S3_PUBLIC_BASE_URL:}

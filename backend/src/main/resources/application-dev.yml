@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:codenest_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+    username: ${MYSQL_USERNAME:codenest}
+    password: ${MYSQL_PASSWORD:codenest}
+
+codenest:
+  storage:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    region: ${S3_REGION:us-east-1}
+    bucket: ${S3_BUCKET:codenest-dev}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    public-base-url: ${S3_PUBLIC_BASE_URL:http://localhost:9000/codenest-dev}
