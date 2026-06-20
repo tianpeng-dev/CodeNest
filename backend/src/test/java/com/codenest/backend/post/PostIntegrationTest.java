@@ -52,6 +52,7 @@ class PostIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    jdbcTemplate.update("DELETE FROM sensitive_words");
     jdbcTemplate.update("DELETE FROM favorites");
     jdbcTemplate.update("DELETE FROM post_reactions");
     jdbcTemplate.update("DELETE FROM post_tags");
@@ -204,6 +205,49 @@ class PostIntegrationTest {
   }
 
   @Test
+  void hiddenPostCannotBeMutatedByOwner() throws Exception {
+    Long updatePostId = insertPost(ownerId, categoryId, "Hidden update", "hidden", 0, 0, 0);
+    Long publishPostId = insertPost(ownerId, categoryId, "Hidden publish", "hidden", 0, 0, 0);
+    Long deletePostId = insertPost(ownerId, categoryId, "Hidden delete", "hidden", 0, 0, 0);
+
+    mockMvc
+        .perform(
+            put("/posts/{id}", updatePostId)
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Owner hidden update",
+                      "content": "Hidden posts should stay guarded",
+                      "categoryId": "%s",
+                      "status": "draft"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    mockMvc
+        .perform(
+            post("/posts/{id}/publish", publishPostId)
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    mockMvc
+        .perform(
+            delete("/posts/{id}", deletePostId).with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    Integer hiddenCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM posts WHERE status = 'hidden'", Integer.class);
+    assertThat(hiddenCount).isEqualTo(3);
+  }
+
+  @Test
   void softDeletedPostCannotBeUpdatedOrRepublishedThroughUpdate() throws Exception {
     Long postId = insertPost(ownerId, categoryId, "Deleted post", "draft", 0, 0, 0);
 
@@ -255,6 +299,72 @@ class PostIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.tags.length()").value(1))
         .andExpect(jsonPath("$.data.tags[0]").value("java"));
+  }
+
+  @Test
+  void publishedCreateWithHighSensitiveWordIsBlocked() throws Exception {
+    insertSensitiveWord("launchcode", "high");
+
+    mockMvc
+        .perform(
+            post("/posts/drafts")
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "launchcode announcement",
+                      "content": "Safe content",
+                      "categoryId": "%s",
+                      "status": "published"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40022));
+
+    Integer count =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM posts WHERE title LIKE '%launchcode%'", Integer.class);
+    assertThat(count).isZero();
+  }
+
+  @Test
+  void publishWithHighSensitiveWordIsBlocked() throws Exception {
+    insertSensitiveWord("redflag", "high");
+    Long postId = insertPost(ownerId, categoryId, "redflag draft", "draft", 0, 0, 0);
+
+    mockMvc
+        .perform(post("/posts/{id}/publish", postId).with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40022));
+
+    String status =
+        jdbcTemplate.queryForObject("SELECT status FROM posts WHERE id = ?", String.class, postId);
+    assertThat(status).isEqualTo("draft");
+  }
+
+  @Test
+  void publishedUpdateWithHighSensitiveWordIsBlocked() throws Exception {
+    insertSensitiveWord("blockedupdate", "high");
+    Long postId = insertPost(ownerId, categoryId, "Published post", "published", 0, 0, 0);
+
+    mockMvc
+        .perform(
+            put("/posts/{id}", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Published post",
+                      "content": "blockedupdate appears here",
+                      "categoryId": "%s",
+                      "status": "published"
+                    }
+                    """
+                        .formatted(categoryId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40022));
   }
 
   @Test
@@ -508,5 +618,22 @@ class PostIntegrationTest {
         "INSERT INTO favorites (post_id, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
         postId,
         userId);
+  }
+
+  private void insertSensitiveWord(String word, String level) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO sensitive_words (
+          word,
+          level,
+          hit_count,
+          created_by,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        word,
+        level,
+        ownerId);
   }
 }

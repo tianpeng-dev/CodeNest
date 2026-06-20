@@ -9,6 +9,7 @@ import com.codenest.backend.category.dto.CategoryDto;
 import com.codenest.backend.common.BusinessException;
 import com.codenest.backend.common.ErrorCode;
 import com.codenest.backend.common.PageResult;
+import com.codenest.backend.moderation.SensitiveWordService;
 import com.codenest.backend.post.dto.PostDraftRequest;
 import com.codenest.backend.post.dto.PostDto;
 import com.codenest.backend.post.dto.PostQuery;
@@ -48,6 +49,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   private final CategoryMapper categoryMapper;
   private final CurrentUserProvider currentUserProvider;
   private final PermissionService permissionService;
+  private final SensitiveWordService sensitiveWordService;
 
   public PostService(
       PostTagMapper postTagMapper,
@@ -56,7 +58,8 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
       UserMapper userMapper,
       CategoryMapper categoryMapper,
       CurrentUserProvider currentUserProvider,
-      PermissionService permissionService) {
+      PermissionService permissionService,
+      SensitiveWordService sensitiveWordService) {
     this.postTagMapper = postTagMapper;
     this.postReactionMapper = postReactionMapper;
     this.favoriteMapper = favoriteMapper;
@@ -64,6 +67,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     this.categoryMapper = categoryMapper;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.sensitiveWordService = sensitiveWordService;
   }
 
   public PageResult<PostDto> listPublic(PostQuery query) {
@@ -105,6 +109,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     CategoryEntity category = requireActiveCategory(request.categoryId());
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
+    assertPublishAllowed(status, request.title(), request.summary(), request.content());
 
     LocalDateTime now = LocalDateTime.now();
     PostEntity post = new PostEntity();
@@ -132,12 +137,13 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   public PostDto update(Long id, PostDraftRequest request) {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
-    requireNotDeleted(post);
+    requireMutablePost(post);
     requireActiveCategory(request.categoryId());
 
     String previousStatus = post.getStatus();
     String status = normalizeRequestedStatus(request.status());
     validateContentAllowed(request.title(), request.summary(), request.content());
+    assertPublishAllowed(status, request.title(), request.summary(), request.content());
 
     post.setTitle(trimRequired(request.title(), "Title is required"));
     post.setSummary(defaultString(request.summary()));
@@ -160,9 +166,8 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   public PostDto publish(Long id) {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
-    if (STATUS_DELETED.equals(post.getStatus())) {
-      throw new BusinessException(ErrorCode.BAD_REQUEST, "Deleted post cannot be published");
-    }
+    requireMutablePost(post);
+    sensitiveWordService.assertPublishAllowed(post.getTitle(), post.getSummary(), post.getContent());
 
     LocalDateTime now = LocalDateTime.now();
     post.setStatus(STATUS_PUBLISHED);
@@ -178,6 +183,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   public void softDelete(Long id) {
     PostEntity post = requirePost(id);
     requireManagePermission(post);
+    requireMutablePost(post);
     post.setStatus(STATUS_DELETED);
     post.setUpdatedAt(LocalDateTime.now());
     updateById(post);
@@ -432,9 +438,9 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     return category;
   }
 
-  private void requireNotDeleted(PostEntity post) {
-    if (STATUS_DELETED.equals(post.getStatus())) {
-      throw new BusinessException(ErrorCode.BAD_REQUEST, "Deleted post cannot be updated");
+  private void requireMutablePost(PostEntity post) {
+    if (!STATUS_DRAFT.equals(post.getStatus()) && !STATUS_PUBLISHED.equals(post.getStatus())) {
+      throw new BusinessException(ErrorCode.BAD_REQUEST, "Post status cannot be mutated here");
     }
   }
 
@@ -521,6 +527,12 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   private void validateContentAllowed(String title, String summary, String content) {
     trimRequired(title, "Title is required");
     trimRequired(content, "Content is required");
+  }
+
+  private void assertPublishAllowed(String status, String title, String summary, String content) {
+    if (STATUS_PUBLISHED.equals(status)) {
+      sensitiveWordService.assertPublishAllowed(title, summary, content);
+    }
   }
 
   private String trimRequired(String value, String message) {

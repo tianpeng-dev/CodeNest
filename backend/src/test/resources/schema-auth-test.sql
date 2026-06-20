@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS favorites;
 DROP TABLE IF EXISTS post_reactions;
 DROP TABLE IF EXISTS post_tags;
 DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS sensitive_words;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
@@ -84,4 +85,15 @@ CREATE TABLE favorites (
   user_id BIGINT NOT NULL,
   created_at TIMESTAMP NOT NULL,
   CONSTRAINT uk_favorites UNIQUE (post_id, user_id)
+);
+
+CREATE TABLE sensitive_words (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  word VARCHAR(100) NOT NULL,
+  level VARCHAR(20) NOT NULL,
+  hit_count INT NOT NULL DEFAULT 0,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_sensitive_words_word UNIQUE (word)
 );
