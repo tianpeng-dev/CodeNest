@@ -107,6 +107,18 @@ class UploadIntegrationTest {
   }
 
   @Test
+  void missingContentTypeIsRejectedAsBadRequest() throws Exception {
+    MockMultipartFile file = new MockMultipartFile("file", "image", null, "bytes".getBytes());
+
+    mockMvc
+        .perform(multipart("/uploads/images").file(file).with(jwt().jwt(jwt -> jwt.subject(CLERK_ID))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    assertThat(storageService.callCount).isZero();
+  }
+
+  @Test
   void oversizedFileIsRejected() throws Exception {
     byte[] oversized = new byte[(5 * 1024 * 1024) + 1];
     MockMultipartFile file =

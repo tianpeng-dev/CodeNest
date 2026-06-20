@@ -22,7 +22,8 @@ public class S3StorageConfig {
         S3Client.builder()
             .region(Region.of(properties.getRegion()))
             .credentialsProvider(credentialsProvider(properties))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+            .serviceConfiguration(
+                S3Configuration.builder().pathStyleAccessEnabled(properties.isPathStyle()).build());
 
     if (StringUtils.hasText(properties.getEndpoint())) {
       builder.endpointOverride(URI.create(properties.getEndpoint()));

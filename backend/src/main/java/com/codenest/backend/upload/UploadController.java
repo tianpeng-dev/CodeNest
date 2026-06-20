@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -75,6 +76,10 @@ public class UploadController {
     }
 
     String contentType = file.getContentType();
+    if (!StringUtils.hasText(contentType)) {
+      throw new BusinessException(ErrorCode.BAD_REQUEST, "Missing content type");
+    }
+
     if (!EXTENSIONS.containsKey(contentType)) {
       throw new BusinessException(ErrorCode.BAD_REQUEST, "Unsupported image type");
     }

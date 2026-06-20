@@ -10,6 +10,7 @@ public class StorageProperties {
   private String accessKey = "";
   private String secretKey = "";
   private String publicBaseUrl = "";
+  private boolean pathStyle = true;
 
   public String getEndpoint() {
     return endpoint;
@@ -57,5 +58,13 @@ public class StorageProperties {
 
   public void setPublicBaseUrl(String publicBaseUrl) {
     this.publicBaseUrl = publicBaseUrl;
+  }
+
+  public boolean isPathStyle() {
+    return pathStyle;
+  }
+
+  public void setPathStyle(boolean pathStyle) {
+    this.pathStyle = pathStyle;
   }
 }
