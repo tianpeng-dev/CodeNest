@@ -123,6 +123,7 @@ const activeCategoryInfo = computed(() => {
 
 const headlinePost = computed(() => posts.value[0] ?? null);
 const carouselPosts = computed(() => posts.value.slice(0, 3));
+const isAllCategory = computed(() => activeCategory.value === 'all');
 
 const recommendedUsers = computed<User[]>(() => {
   const usersById = new Map<string, User>();
@@ -264,7 +265,7 @@ onMounted(() => {
         </el-radio-group>
       </section>
 
-      <section class="top-grid">
+      <section v-if="isAllCategory" class="top-grid">
         <article class="portal-surface headline-block">
           <span class="section-kicker">头条</span>
           <el-skeleton v-if="loading" :rows="4" animated />

@@ -15,6 +15,8 @@ describe('home page filtering', () => {
 
     expect(source).toContain('categorySlug');
     expect(source).toContain('requestSequence');
+    expect(source).toContain("const isAllCategory = computed(() => activeCategory.value === 'all')");
+    expect(source).toContain('<section v-if="isAllCategory" class="top-grid">');
     expect(source).toContain(':value="category.value"');
     expect(source).not.toContain(':label="category.id"');
     expect(source).not.toContain("categoryId:");
