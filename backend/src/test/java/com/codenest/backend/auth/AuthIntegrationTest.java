@@ -102,6 +102,50 @@ class AuthIntegrationTest {
   }
 
   @Test
+  void publicUserProfileReturnsFrontendUserShapeWithoutAuthentication() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO users (
+          clerk_user_id,
+          username,
+          display_name,
+          avatar_url,
+          bio,
+          role,
+          status,
+          post_count,
+          like_count,
+          favorite_count,
+          follower_count,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'user', 'active', 3, 7, 5, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "clerk_public_profile",
+        "publicpeng",
+        "Public Peng",
+        "https://cdn.example.com/public.png",
+        "Visible bio");
+    Long userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM users WHERE clerk_user_id = ?", Long.class, "clerk_public_profile");
+
+    mockMvc
+        .perform(get("/users/{id}", userId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.id").value(String.valueOf(userId)))
+        .andExpect(jsonPath("$.data.username").value("publicpeng"))
+        .andExpect(jsonPath("$.data.displayName").value("Public Peng"))
+        .andExpect(jsonPath("$.data.avatarUrl").value("https://cdn.example.com/public.png"))
+        .andExpect(jsonPath("$.data.bio").value("Visible bio"))
+        .andExpect(jsonPath("$.data.postCount").value(3))
+        .andExpect(jsonPath("$.data.likeCount").value(7))
+        .andExpect(jsonPath("$.data.favoriteCount").value(5))
+        .andExpect(jsonPath("$.data.followerCount").value(2));
+  }
+
+  @Test
   void adminRoutesRejectUnauthenticatedRequests() throws Exception {
     mockMvc.perform(get("/admin/users")).andExpect(status().isUnauthorized());
   }

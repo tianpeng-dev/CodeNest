@@ -2,7 +2,10 @@ package com.codenest.backend.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.codenest.backend.common.BusinessException;
+import com.codenest.backend.common.ErrorCode;
 import com.codenest.backend.security.ClerkUserSyncService.ClerkProfile;
+import com.codenest.backend.user.dto.UserDto;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -24,6 +27,14 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
     }
 
     return updateFromClerkProfile(user, profile);
+  }
+
+  public UserDto getPublicProfile(Long id) {
+    UserEntity user = getById(id);
+    if (user == null) {
+      throw new BusinessException(ErrorCode.NOT_FOUND, "User not found");
+    }
+    return UserDto.from(user);
   }
 
   private UserEntity createWithDuplicateRetry(ClerkProfile profile) {

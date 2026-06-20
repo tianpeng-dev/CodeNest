@@ -54,6 +54,8 @@ class PostIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    jdbcTemplate.update("DELETE FROM notifications");
+    jdbcTemplate.update("DELETE FROM comments");
     jdbcTemplate.update("DELETE FROM sensitive_words");
     jdbcTemplate.update("DELETE FROM favorites");
     jdbcTemplate.update("DELETE FROM post_reactions");
@@ -170,6 +172,50 @@ class PostIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value(1))
         .andExpect(jsonPath("$.data.items[0].title").value("Updated API"));
+  }
+
+  @Test
+  void creatorAnalyticsSummarizesCurrentUsersPosts() throws Exception {
+    Long publishedPostId = insertPost(ownerId, categoryId, "Published analytics", "published", 5, 2, 1);
+    insertPost(ownerId, categoryId, "Draft analytics", "draft", 3, 0, 0);
+    insertPost(ownerId, categoryId, "Deleted analytics", "deleted", 99, 99, 99);
+    insertPost(otherId(), categoryId, "Other analytics", "published", 100, 100, 100);
+    jdbcTemplate.update("UPDATE posts SET favorite_count = 4 WHERE id = ?", publishedPostId);
+
+    mockMvc
+        .perform(get("/creator/analytics").with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.postCount").value(2))
+        .andExpect(jsonPath("$.data.publishedCount").value(1))
+        .andExpect(jsonPath("$.data.draftCount").value(1))
+        .andExpect(jsonPath("$.data.totalViews").value(8))
+        .andExpect(jsonPath("$.data.totalLikes").value(2))
+        .andExpect(jsonPath("$.data.totalFavorites").value(4))
+        .andExpect(jsonPath("$.data.trend.length()").value(7))
+        .andExpect(jsonPath("$.data.pie[0].name").value("Backend"))
+        .andExpect(jsonPath("$.data.pie[0].value").value(2));
+  }
+
+  @Test
+  void creatorCommentsReturnsVisibleCommentsReceivedByCurrentUsersPosts() throws Exception {
+    Long ownerPostId = insertPost(ownerId, categoryId, "Owner received comments", "published", 0, 0, 0);
+    Long otherPostId = insertPost(otherId(), categoryId, "Other received comments", "published", 0, 0, 0);
+    Long visibleCommentId = insertComment(ownerPostId, otherId(), "Useful note", "visible");
+    insertComment(ownerPostId, otherId(), "Hidden note", "deleted");
+    insertComment(otherPostId, ownerId, "Not received by owner", "visible");
+
+    mockMvc
+        .perform(get("/creator/comments").with(jwt().jwt(jwt -> jwt.subject(OWNER_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].id").value(String.valueOf(visibleCommentId)))
+        .andExpect(jsonPath("$.data[0].postId").value(String.valueOf(ownerPostId)))
+        .andExpect(jsonPath("$.data[0].post.id").value(String.valueOf(ownerPostId)))
+        .andExpect(jsonPath("$.data[0].post.title").value("Owner received comments"))
+        .andExpect(jsonPath("$.data[0].author.username").value("postother"))
+        .andExpect(jsonPath("$.data[0].content").value("Useful note"));
   }
 
   @Test
@@ -672,6 +718,25 @@ class PostIntegrationTest {
         "INSERT INTO favorites (post_id, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
         postId,
         userId);
+  }
+
+  private Long insertComment(Long postId, Long authorId, String content, String status) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO comments (
+          post_id,
+          author_id,
+          content,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        postId,
+        authorId,
+        content,
+        status);
+    return jdbcTemplate.queryForObject("SELECT MAX(id) FROM comments", Long.class);
   }
 
   private void insertSensitiveWord(String word, String level) {

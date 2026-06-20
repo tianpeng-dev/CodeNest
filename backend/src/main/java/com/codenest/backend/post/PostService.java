@@ -6,20 +6,30 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.codenest.backend.category.CategoryEntity;
 import com.codenest.backend.category.CategoryMapper;
 import com.codenest.backend.category.dto.CategoryDto;
+import com.codenest.backend.comment.CommentEntity;
+import com.codenest.backend.comment.CommentMapper;
 import com.codenest.backend.common.BusinessException;
 import com.codenest.backend.common.ErrorCode;
 import com.codenest.backend.common.PageResult;
 import com.codenest.backend.moderation.SensitiveWordService;
+import com.codenest.backend.post.dto.CreatorAnalyticsDto;
+import com.codenest.backend.post.dto.CreatorCommentDto;
+import com.codenest.backend.post.dto.PiePointDto;
 import com.codenest.backend.post.dto.PostDraftRequest;
 import com.codenest.backend.post.dto.PostDto;
 import com.codenest.backend.post.dto.PostQuery;
+import com.codenest.backend.post.dto.PostSummaryDto;
+import com.codenest.backend.post.dto.TrendPointDto;
 import com.codenest.backend.security.CurrentUser;
 import com.codenest.backend.security.CurrentUserProvider;
 import com.codenest.backend.security.PermissionService;
 import com.codenest.backend.user.UserEntity;
 import com.codenest.backend.user.UserMapper;
 import com.codenest.backend.user.dto.UserDto;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,12 +49,14 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   private static final String STATUS_DRAFT = "draft";
   private static final String STATUS_PUBLISHED = "published";
   private static final String STATUS_DELETED = "deleted";
+  private static final String COMMENT_STATUS_VISIBLE = "visible";
   private static final String REACTION_LIKE = "like";
   private static final String REACTION_DISLIKE = "dislike";
 
   private final PostTagMapper postTagMapper;
   private final PostReactionMapper postReactionMapper;
   private final FavoriteMapper favoriteMapper;
+  private final CommentMapper commentMapper;
   private final UserMapper userMapper;
   private final CategoryMapper categoryMapper;
   private final CurrentUserProvider currentUserProvider;
@@ -55,6 +67,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
       PostTagMapper postTagMapper,
       PostReactionMapper postReactionMapper,
       FavoriteMapper favoriteMapper,
+      CommentMapper commentMapper,
       UserMapper userMapper,
       CategoryMapper categoryMapper,
       CurrentUserProvider currentUserProvider,
@@ -63,6 +76,7 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     this.postTagMapper = postTagMapper;
     this.postReactionMapper = postReactionMapper;
     this.favoriteMapper = favoriteMapper;
+    this.commentMapper = commentMapper;
     this.userMapper = userMapper;
     this.categoryMapper = categoryMapper;
     this.currentUserProvider = currentUserProvider;
@@ -88,6 +102,54 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
   public PageResult<PostDto> listCreator(PostQuery query) {
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
     return listPosts(query, currentUser.id(), false);
+  }
+
+  public CreatorAnalyticsDto creatorAnalytics() {
+    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    List<PostEntity> posts =
+        list(
+            new LambdaQueryWrapper<PostEntity>()
+                .eq(PostEntity::getAuthorId, currentUser.id())
+                .ne(PostEntity::getStatus, STATUS_DELETED));
+
+    int publishedCount = countStatus(posts, STATUS_PUBLISHED);
+    int draftCount = countStatus(posts, STATUS_DRAFT);
+    int totalViews = posts.stream().mapToInt(post -> defaultInt(post.getViewCount())).sum();
+    int totalLikes = posts.stream().mapToInt(post -> defaultInt(post.getLikeCount())).sum();
+    int totalFavorites = posts.stream().mapToInt(post -> defaultInt(post.getFavoriteCount())).sum();
+
+    return new CreatorAnalyticsDto(
+        posts.size(),
+        publishedCount,
+        draftCount,
+        totalViews,
+        totalLikes,
+        totalFavorites,
+        buildTrend(posts),
+        buildCategoryPie(posts));
+  }
+
+  public List<CreatorCommentDto> creatorComments() {
+    CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    List<PostEntity> posts =
+        list(
+            new LambdaQueryWrapper<PostEntity>()
+                .eq(PostEntity::getAuthorId, currentUser.id())
+                .ne(PostEntity::getStatus, STATUS_DELETED));
+    if (posts.isEmpty()) {
+      return List.of();
+    }
+
+    Map<Long, PostEntity> postsById =
+        posts.stream().collect(Collectors.toMap(PostEntity::getId, post -> post));
+    List<CommentEntity> comments =
+        commentMapper.selectList(
+            new LambdaQueryWrapper<CommentEntity>()
+                .in(CommentEntity::getPostId, postsById.keySet())
+                .eq(CommentEntity::getStatus, COMMENT_STATUS_VISIBLE)
+                .orderByDesc(CommentEntity::getCreatedAt)
+                .orderByDesc(CommentEntity::getId));
+    return comments.stream().map(comment -> toCreatorCommentDto(comment, postsById)).toList();
   }
 
   public PostDto getPublic(Long id) {
@@ -233,6 +295,65 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
     }
 
     return toDto(requirePost(post.getId()));
+  }
+
+  private int countStatus(List<PostEntity> posts, String status) {
+    return (int) posts.stream().filter(post -> status.equals(post.getStatus())).count();
+  }
+
+  private List<TrendPointDto> buildTrend(List<PostEntity> posts) {
+    LocalDate today = LocalDate.now();
+    Map<LocalDate, Long> viewsByDate = new LinkedHashMap<>();
+    for (int daysAgo = 6; daysAgo >= 0; daysAgo--) {
+      viewsByDate.put(today.minusDays(daysAgo), 0L);
+    }
+
+    for (PostEntity post : posts) {
+      LocalDate date = postTrendDate(post);
+      if (viewsByDate.containsKey(date)) {
+        viewsByDate.put(date, viewsByDate.get(date) + defaultInt(post.getViewCount()));
+      }
+    }
+
+    DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+    return viewsByDate.entrySet().stream()
+        .map(entry -> new TrendPointDto(formatter.format(entry.getKey()), entry.getValue()))
+        .toList();
+  }
+
+  private LocalDate postTrendDate(PostEntity post) {
+    LocalDateTime source =
+        post.getUpdatedAt() != null
+            ? post.getUpdatedAt()
+            : post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now();
+    return source.toLocalDate();
+  }
+
+  private List<PiePointDto> buildCategoryPie(List<PostEntity> posts) {
+    Map<Long, Long> countsByCategory =
+        posts.stream()
+            .collect(
+                Collectors.groupingBy(
+                    PostEntity::getCategoryId, LinkedHashMap::new, Collectors.counting()));
+    return countsByCategory.entrySet().stream()
+        .map(entry -> new PiePointDto(categoryName(entry.getKey()), entry.getValue()))
+        .toList();
+  }
+
+  private String categoryName(Long categoryId) {
+    CategoryEntity category = categoryMapper.selectById(categoryId);
+    return category == null ? "Unknown" : category.getName();
+  }
+
+  private CreatorCommentDto toCreatorCommentDto(
+      CommentEntity comment, Map<Long, PostEntity> postsById) {
+    UserEntity author = userMapper.selectById(comment.getAuthorId());
+    PostEntity post = postsById.get(comment.getPostId());
+    if (author == null || post == null) {
+      throw new BusinessException(ErrorCode.SERVER_ERROR, "Comment relation is invalid");
+    }
+    return CreatorCommentDto.from(
+        comment, author, new PostSummaryDto(String.valueOf(post.getId()), post.getTitle()));
   }
 
   private PageResult<PostDto> listPosts(PostQuery query, Long forcedAuthorId, boolean publicOnly) {

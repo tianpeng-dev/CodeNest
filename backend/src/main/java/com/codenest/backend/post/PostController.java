@@ -2,10 +2,13 @@ package com.codenest.backend.post;
 
 import com.codenest.backend.common.ApiResponse;
 import com.codenest.backend.common.PageResult;
+import com.codenest.backend.post.dto.CreatorAnalyticsDto;
+import com.codenest.backend.post.dto.CreatorCommentDto;
 import com.codenest.backend.post.dto.PostDraftRequest;
 import com.codenest.backend.post.dto.PostDto;
 import com.codenest.backend.post.dto.PostQuery;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -36,6 +39,16 @@ public class PostController {
   @GetMapping("/creator/posts")
   public ApiResponse<PageResult<PostDto>> listCreator(@ModelAttribute PostQuery query) {
     return ApiResponse.ok(postService.listCreator(query));
+  }
+
+  @GetMapping("/creator/analytics")
+  public ApiResponse<CreatorAnalyticsDto> creatorAnalytics() {
+    return ApiResponse.ok(postService.creatorAnalytics());
+  }
+
+  @GetMapping("/creator/comments")
+  public ApiResponse<List<CreatorCommentDto>> creatorComments() {
+    return ApiResponse.ok(postService.creatorComments());
   }
 
   @PostMapping("/posts/drafts")
