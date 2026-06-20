@@ -29,6 +29,9 @@ public class AdminAuthorizationManager
     }
 
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
+    if (!"active".equals(currentUser.status())) {
+      return new AuthorizationDecision(false);
+    }
     if ("admin".equals(currentUser.role())) {
       return new AuthorizationDecision(true);
     }

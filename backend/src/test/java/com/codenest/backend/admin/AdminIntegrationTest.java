@@ -38,6 +38,8 @@ class AdminIntegrationTest {
   private static final String ADMIN_CLERK_ID = "clerk_admin_admin";
   private static final String USER_CLERK_ID = "clerk_admin_user";
   private static final String MODERATOR_CLERK_ID = "clerk_admin_moderator";
+  private static final String BANNED_ADMIN_CLERK_ID = "clerk_admin_banned_admin";
+  private static final String BANNED_MODERATOR_CLERK_ID = "clerk_admin_banned_moderator";
 
   @Autowired private MockMvc mockMvc;
 
@@ -63,6 +65,9 @@ class AdminIntegrationTest {
     userId = insertUser(USER_CLERK_ID, "memberapi", "Member API", "user", "active");
     moderatorId =
         insertUser(MODERATOR_CLERK_ID, "modapi", "Moderator API", "moderator", "active");
+    insertUser(BANNED_ADMIN_CLERK_ID, "bannedadmin", "Banned Admin", "admin", "banned");
+    insertUser(
+        BANNED_MODERATOR_CLERK_ID, "bannedmod", "Banned Moderator", "moderator", "banned");
   }
 
   @Test
@@ -79,7 +84,7 @@ class AdminIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
         .andExpect(jsonPath("$.data[0].label").value("Total users"))
-        .andExpect(jsonPath("$.data[0].value").value(3))
+        .andExpect(jsonPath("$.data[0].value").value(5))
         .andExpect(jsonPath("$.data[1].label").value("Published posts"))
         .andExpect(jsonPath("$.data[1].value").value(1))
         .andExpect(jsonPath("$.data[2].label").value("Hidden posts"))
@@ -94,6 +99,69 @@ class AdminIntegrationTest {
         .perform(get("/admin/metrics").with(jwt().jwt(jwt -> jwt.subject(USER_CLERK_ID))))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(40003));
+  }
+
+  @Test
+  void bannedAdminCannotAccessAdminEndpoints() throws Exception {
+    mockMvc
+        .perform(
+            get("/admin/metrics").with(jwt().jwt(jwt -> jwt.subject(BANNED_ADMIN_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+  }
+
+  @Test
+  void bannedModeratorCannotAccessModeratorAdminPostEndpoints() throws Exception {
+    Long categoryId = insertCategory("Banned Scope", "banned-scope");
+    Long bannedModeratorId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM users WHERE clerk_user_id = ?",
+            Long.class,
+            BANNED_MODERATOR_CLERK_ID);
+    insertModerator(categoryId, bannedModeratorId);
+    Long postId = insertPost(userId, categoryId, "Banned moderator target", "published");
+
+    mockMvc
+        .perform(get("/admin/posts").with(jwt().jwt(jwt -> jwt.subject(BANNED_MODERATOR_CLERK_ID))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+
+    mockMvc
+        .perform(
+            patch("/admin/posts/{id}/status", postId)
+                .with(jwt().jwt(jwt -> jwt.subject(BANNED_MODERATOR_CLERK_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"status":"hidden","reason":"Should be denied"}
+                    """))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+  }
+
+  @Test
+  void adminAnalyticsReturnsGroupedCounts() throws Exception {
+    Long categoryId = insertCategory("Analytics", "analytics");
+    insertPost(userId, categoryId, "Analytics published", "published");
+    insertPost(userId, categoryId, "Analytics hidden", "hidden");
+    insertPost(userId, categoryId, "Analytics deleted", "deleted");
+    Long lowWordId = insertSensitiveWord("low-watch", "low");
+    Long highWordId = insertSensitiveWord("high-watch", "high");
+    insertSensitiveHit(lowWordId, userId, "low");
+    insertSensitiveHit(highWordId, userId, "high");
+    insertSensitiveHit(highWordId, userId, "high");
+
+    mockMvc
+        .perform(get("/admin/analytics").with(jwt().jwt(jwt -> jwt.subject(ADMIN_CLERK_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.data.postsByStatus.published").value(1))
+        .andExpect(jsonPath("$.data.postsByStatus.hidden").value(1))
+        .andExpect(jsonPath("$.data.postsByStatus.deleted").value(1))
+        .andExpect(jsonPath("$.data.usersByStatus.active").value(3))
+        .andExpect(jsonPath("$.data.usersByStatus.banned").value(2))
+        .andExpect(jsonPath("$.data.sensitiveHitsByLevel.low").value(1))
+        .andExpect(jsonPath("$.data.sensitiveHitsByLevel.high").value(2));
   }
 
   @Test

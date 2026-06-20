@@ -2,6 +2,7 @@ package com.codenest.backend.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.codenest.backend.admin.dto.AdminAnalyticsDto;
+import com.codenest.backend.admin.dto.AdminCountGroupDto;
 import com.codenest.backend.admin.dto.AdminMetricDto;
 import com.codenest.backend.admin.dto.AdminModeratorDto;
 import com.codenest.backend.admin.dto.AdminModeratorRequest;
@@ -415,18 +416,15 @@ public class AdminService {
   }
 
   private Map<String, Long> countPostsByStatus() {
-    return postMapper.selectList(null).stream()
-        .collect(Collectors.groupingBy(PostEntity::getStatus, LinkedHashMap::new, Collectors.counting()));
+    return toCountMap(postMapper.countByStatus());
   }
 
   private Map<String, Long> countUsersByStatus() {
-    return userMapper.selectList(null).stream()
-        .collect(Collectors.groupingBy(UserEntity::getStatus, LinkedHashMap::new, Collectors.counting()));
+    return toCountMap(userMapper.countByStatus());
   }
 
   private Map<String, Long> countSensitiveHitsByLevel() {
-    return sensitiveWordHitMapper.selectList(null).stream()
-        .collect(Collectors.groupingBy(SensitiveWordHitEntity::getLevel, LinkedHashMap::new, Collectors.counting()));
+    return toCountMap(sensitiveWordHitMapper.countByLevel());
   }
 
   private long countPostsByStatus(String status) {
@@ -571,6 +569,14 @@ public class AdminService {
     } catch (JsonProcessingException exception) {
       throw new BusinessException(ErrorCode.SERVER_ERROR, "Audit log detail is invalid");
     }
+  }
+
+  private Map<String, Long> toCountMap(List<AdminCountGroupDto> rows) {
+    Map<String, Long> counts = new LinkedHashMap<>();
+    for (AdminCountGroupDto row : rows) {
+      counts.put(row.getGroupKey(), row.getCount() == null ? 0L : row.getCount());
+    }
+    return counts;
   }
 
   private Map<String, Object> details(Object... keysAndValues) {
