@@ -52,8 +52,9 @@ public class UploadController {
   public ApiResponse<UploadResultDto> uploadImage(@RequestPart("file") MultipartFile file) {
     CurrentUser currentUser = currentUserProvider.requireCurrentUser();
     String contentType = validateImage(file);
-    String objectKey = objectKey(currentUser.id(), EXTENSIONS.get(contentType));
     byte[] bytes = bytes(file);
+    validateImageSignature(contentType, bytes);
+    String objectKey = objectKey(currentUser.id(), EXTENSIONS.get(contentType));
     String url = storageService.upload(objectKey, bytes, contentType);
 
     FileObjectEntity entity = new FileObjectEntity();
@@ -64,7 +65,12 @@ public class UploadController {
     entity.setContentType(contentType);
     entity.setSizeBytes(file.getSize());
     entity.setCreatedAt(LocalDateTime.now());
-    fileObjectMapper.insert(entity);
+    try {
+      fileObjectMapper.insert(entity);
+    } catch (RuntimeException exception) {
+      deleteUploadedObject(objectKey, exception);
+      throw exception;
+    }
 
     return ApiResponse.ok(
         new UploadResultDto(String.valueOf(entity.getId()), url, contentType, file.getSize()));
@@ -89,6 +95,58 @@ public class UploadController {
     }
 
     return contentType;
+  }
+
+  private void validateImageSignature(String contentType, byte[] bytes) {
+    boolean valid =
+        switch (contentType) {
+          case MediaType.IMAGE_PNG_VALUE -> hasPrefix(
+              bytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
+          case MediaType.IMAGE_JPEG_VALUE -> hasPrefix(bytes, 0xFF, 0xD8, 0xFF);
+          case MediaType.IMAGE_GIF_VALUE -> isGif(bytes);
+          case "image/webp" -> isWebp(bytes);
+          default -> false;
+        };
+
+    if (!valid) {
+      throw new BusinessException(ErrorCode.BAD_REQUEST, "Invalid image content");
+    }
+  }
+
+  private boolean hasPrefix(byte[] bytes, int... prefix) {
+    if (bytes.length < prefix.length) {
+      return false;
+    }
+
+    for (int i = 0; i < prefix.length; i++) {
+      if ((bytes[i] & 0xFF) != prefix[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private boolean isGif(byte[] bytes) {
+    return hasPrefix(bytes, 'G', 'I', 'F', '8', '7', 'a')
+        || hasPrefix(bytes, 'G', 'I', 'F', '8', '9', 'a');
+  }
+
+  private boolean isWebp(byte[] bytes) {
+    return bytes.length >= 12
+        && hasPrefix(bytes, 'R', 'I', 'F', 'F')
+        && bytes[8] == 'W'
+        && bytes[9] == 'E'
+        && bytes[10] == 'B'
+        && bytes[11] == 'P';
+  }
+
+  private void deleteUploadedObject(String objectKey, RuntimeException originalException) {
+    try {
+      storageService.delete(objectKey);
+    } catch (RuntimeException deleteException) {
+      originalException.addSuppressed(deleteException);
+    }
   }
 
   private byte[] bytes(MultipartFile file) {

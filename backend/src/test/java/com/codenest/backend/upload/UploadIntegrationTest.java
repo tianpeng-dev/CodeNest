@@ -56,7 +56,7 @@ class UploadIntegrationTest {
   @Test
   void authenticatedImageUploadStoresMetadataAndReturnsUrl() throws Exception {
     MockMultipartFile file =
-        new MockMultipartFile("file", "avatar.png", MediaType.IMAGE_PNG_VALUE, "png-bytes".getBytes());
+        new MockMultipartFile("file", "avatar.png", MediaType.IMAGE_PNG_VALUE, validPngBytes());
 
     mockMvc
         .perform(multipart("/uploads/images").file(file).with(jwt().jwt(jwt -> jwt.subject(CLERK_ID))))
@@ -119,6 +119,20 @@ class UploadIntegrationTest {
   }
 
   @Test
+  void spoofedImageContentIsRejected() throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "fake.png", MediaType.IMAGE_PNG_VALUE, "plain text".getBytes());
+
+    mockMvc
+        .perform(multipart("/uploads/images").file(file).with(jwt().jwt(jwt -> jwt.subject(CLERK_ID))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000));
+
+    assertThat(storageService.callCount).isZero();
+  }
+
+  @Test
   void oversizedFileIsRejected() throws Exception {
     byte[] oversized = new byte[(5 * 1024 * 1024) + 1];
     MockMultipartFile file =
@@ -156,11 +170,20 @@ class UploadIntegrationTest {
       return "https://cdn.example.com/" + objectKey;
     }
 
+    @Override
+    public void delete(String objectKey) {}
+
     private void reset() {
       callCount = 0;
       objectKey = null;
       bytes = null;
       contentType = null;
     }
+  }
+
+  private byte[] validPngBytes() {
+    return new byte[] {
+      (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00
+    };
   }
 }
