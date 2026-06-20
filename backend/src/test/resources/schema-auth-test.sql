@@ -1,4 +1,8 @@
 DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS favorites;
+DROP TABLE IF EXISTS post_reactions;
+DROP TABLE IF EXISTS post_tags;
+DROP TABLE IF EXISTS posts;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
@@ -34,4 +38,50 @@ CREATE TABLE categories (
   updated_at TIMESTAMP NOT NULL,
   CONSTRAINT uk_categories_name UNIQUE (name),
   CONSTRAINT uk_categories_slug UNIQUE (slug)
+);
+
+CREATE TABLE posts (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  author_id BIGINT NOT NULL,
+  category_id BIGINT NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  summary VARCHAR(500) NOT NULL DEFAULT '',
+  content CLOB NOT NULL,
+  cover_url VARCHAR(512) NOT NULL DEFAULT '',
+  status VARCHAR(20) NOT NULL,
+  view_count INT NOT NULL DEFAULT 0,
+  like_count INT NOT NULL DEFAULT 0,
+  dislike_count INT NOT NULL DEFAULT 0,
+  favorite_count INT NOT NULL DEFAULT 0,
+  comment_count INT NOT NULL DEFAULT 0,
+  published_at TIMESTAMP NULL,
+  hidden_reason VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE post_tags (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  tag VARCHAR(40) NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_post_tags UNIQUE (post_id, tag)
+);
+
+CREATE TABLE post_reactions (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  reaction VARCHAR(20) NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_post_reactions UNIQUE (post_id, user_id)
+);
+
+CREATE TABLE favorites (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_favorites UNIQUE (post_id, user_id)
 );
