@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 .superpowers/
+.worktrees
 node_modules/
 dist/
 dist-ssr
