@@ -1,6 +1,9 @@
 DROP TABLE IF EXISTS category_moderators;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS favorites;
+DROP TABLE IF EXISTS follows;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS sensitive_word_hits;
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS post_reactions;
@@ -100,6 +103,14 @@ CREATE TABLE favorites (
   CONSTRAINT uk_favorites UNIQUE (post_id, user_id)
 );
 
+CREATE TABLE follows (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  follower_id BIGINT NOT NULL,
+  following_id BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_follows UNIQUE (follower_id, following_id)
+);
+
 CREATE TABLE comments (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   post_id BIGINT NOT NULL,
@@ -109,6 +120,25 @@ CREATE TABLE comments (
   hidden_reason VARCHAR(500) NULL,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE messages (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  sender_id BIGINT NOT NULL,
+  receiver_id BIGINT NOT NULL,
+  content VARCHAR(2000) NOT NULL,
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE notifications (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  type VARCHAR(40) NOT NULL,
+  title VARCHAR(120) NOT NULL,
+  content VARCHAR(1000) NOT NULL,
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE sensitive_words (

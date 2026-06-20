@@ -6,6 +6,7 @@ import com.codenest.backend.comment.dto.CommentDto;
 import com.codenest.backend.comment.dto.CreateCommentRequest;
 import com.codenest.backend.common.BusinessException;
 import com.codenest.backend.common.ErrorCode;
+import com.codenest.backend.message.NotificationService;
 import com.codenest.backend.moderation.SensitiveWordService;
 import com.codenest.backend.post.PostEntity;
 import com.codenest.backend.post.PostMapper;
@@ -31,18 +32,21 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
   private final CurrentUserProvider currentUserProvider;
   private final PermissionService permissionService;
   private final SensitiveWordService sensitiveWordService;
+  private final NotificationService notificationService;
 
   public CommentService(
       PostMapper postMapper,
       UserMapper userMapper,
       CurrentUserProvider currentUserProvider,
       PermissionService permissionService,
-      SensitiveWordService sensitiveWordService) {
+      SensitiveWordService sensitiveWordService,
+      NotificationService notificationService) {
     this.postMapper = postMapper;
     this.userMapper = userMapper;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
     this.sensitiveWordService = sensitiveWordService;
+    this.notificationService = notificationService;
   }
 
   public List<CommentDto> listPublic(Long postId) {
@@ -79,6 +83,7 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
     save(comment);
     postMapper.incrementCommentCount(post.getId());
     sensitiveWordService.recordHits(scanResult, "comment", comment.getId(), author.getId());
+    notifyPostAuthor(post, author);
     return toDto(comment);
   }
 
@@ -142,6 +147,14 @@ public class CommentService extends ServiceImpl<CommentMapper, CommentEntity> {
       throw new BusinessException(ErrorCode.SERVER_ERROR, "Comment relation is invalid");
     }
     return CommentDto.from(comment, author);
+  }
+
+  private void notifyPostAuthor(PostEntity post, UserEntity commenter) {
+    UserEntity postAuthor = userMapper.selectById(post.getAuthorId());
+    if (postAuthor == null) {
+      throw new BusinessException(ErrorCode.SERVER_ERROR, "Post relation is invalid");
+    }
+    notificationService.createCommentNotification(postAuthor, commenter, post.getTitle());
   }
 
   private String trimRequired(String value, String message) {
