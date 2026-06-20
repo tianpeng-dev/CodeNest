@@ -27,7 +27,7 @@ mybatis-plus:
 codenest:
   storage:
     endpoint: ${S3_ENDPOINT:}
-    region: ${S3_REGION:us-east-1}
+    region: ${S3_REGION:auto}
     bucket: ${S3_BUCKET:codenest-dev}
     access-key: ${S3_ACCESS_KEY:}
     secret-key: ${S3_SECRET_KEY:}

@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS category_moderators;
+DROP TABLE IF EXISTS file_objects;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS favorites;
 DROP TABLE IF EXISTS follows;
@@ -161,4 +162,16 @@ CREATE TABLE sensitive_word_hits (
   level VARCHAR(20) NOT NULL,
   snippet VARCHAR(300) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE file_objects (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  owner_id BIGINT NOT NULL,
+  bucket VARCHAR(100) NOT NULL,
+  object_key VARCHAR(512) NOT NULL,
+  url VARCHAR(1024) NOT NULL,
+  content_type VARCHAR(120) NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  CONSTRAINT uk_file_objects_bucket_key UNIQUE (bucket, object_key)
 );
