@@ -17,6 +17,10 @@ describe('home page filtering', () => {
     expect(source).toContain('requestSequence');
     expect(source).toContain("const isAllCategory = computed(() => activeCategory.value === 'all')");
     expect(source).toContain('<section v-if="isAllCategory" class="top-grid">');
+    expect(source).toContain('const isSidebarCollapsed = ref(false)');
+    expect(source).toContain('function toggleSidebar()');
+    expect(source).toContain("'home-page--sidebar-collapsed': isSidebarCollapsed");
+    expect(source).toContain("isSidebarCollapsed ? '展开左侧主菜单' : '折叠左侧主菜单'");
     expect(source).toContain(':value="category.value"');
     expect(source).not.toContain(':label="category.id"');
     expect(source).not.toContain("categoryId:");

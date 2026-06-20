@@ -5,6 +5,8 @@ import {
   ChatLineRound,
   Collection,
   EditPen,
+  Expand,
+  Fold,
   House,
   Link,
   Reading,
@@ -113,6 +115,7 @@ const posts = ref<Post[]>([]);
 const loading = ref(false);
 const errorMessage = ref('');
 const requestSequence = ref(0);
+const isSidebarCollapsed = ref(false);
 
 const activeCategoryInfo = computed(() => {
   return (
@@ -203,25 +206,55 @@ function handlePageChange(nextPage: number) {
   loadPosts();
 }
 
+function toggleSidebar() {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+}
+
 onMounted(() => {
   loadPosts();
 });
 </script>
 
 <template>
-  <div class="home-page">
-    <aside class="home-page__left" aria-label="站点导航">
-      <section class="side-section">
-        <h2>CodeNest</h2>
+  <div
+    class="home-page"
+    :class="{ 'home-page--sidebar-collapsed': isSidebarCollapsed }"
+  >
+    <aside
+      class="home-page__left"
+      :class="{ 'home-page__left--collapsed': isSidebarCollapsed }"
+      aria-label="站点导航"
+    >
+      <section class="side-section side-section--main">
+        <div class="side-section__header">
+          <h2 v-show="!isSidebarCollapsed">CodeNest</h2>
+          <el-button
+            class="sidebar-toggle"
+            circle
+            text
+            :aria-label="isSidebarCollapsed ? '展开左侧主菜单' : '折叠左侧主菜单'"
+            :title="isSidebarCollapsed ? '展开主菜单' : '折叠主菜单'"
+            @click="toggleSidebar"
+          >
+            <el-icon>
+              <component :is="isSidebarCollapsed ? Expand : Fold" />
+            </el-icon>
+          </el-button>
+        </div>
         <nav class="home-menu">
-          <RouterLink v-for="item in leftMenu" :key="item.label" :to="item.to">
+          <RouterLink
+            v-for="item in leftMenu"
+            :key="item.label"
+            :to="item.to"
+            :title="item.label"
+          >
             <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.label }}</span>
+            <span v-show="!isSidebarCollapsed">{{ item.label }}</span>
           </RouterLink>
         </nav>
       </section>
 
-      <section class="side-section">
+      <section v-if="!isSidebarCollapsed" class="side-section">
         <h2>友情链接</h2>
         <div class="friend-links">
           <a
@@ -237,7 +270,7 @@ onMounted(() => {
         </div>
       </section>
 
-      <p class="filing-text">
+      <p v-if="!isSidebarCollapsed" class="filing-text">
         CodeNest 技术社区<br />
         京ICP备 20260619 号
       </p>
@@ -423,12 +456,21 @@ onMounted(() => {
   grid-template-columns: 180px minmax(0, 1fr) 312px;
   align-items: start;
   gap: 16px;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.home-page--sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1fr) 312px;
 }
 
 .home-page__left,
 .home-page__right {
   display: grid;
   gap: 14px;
+}
+
+.home-page__left {
+  min-width: 0;
 }
 
 .home-page__main {
@@ -450,6 +492,39 @@ onMounted(() => {
 
 .side-section {
   padding: 14px;
+}
+
+.side-section--main {
+  display: grid;
+  gap: 12px;
+}
+
+.side-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  gap: 8px;
+}
+
+.sidebar-toggle {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  color: #344054;
+}
+
+.sidebar-toggle:hover {
+  color: #1f4f8f;
+  background: #eef5ff;
+}
+
+.home-page__left--collapsed .side-section {
+  padding: 10px;
+}
+
+.home-page__left--collapsed .side-section__header {
+  justify-content: center;
 }
 
 .side-section h2,
@@ -475,6 +550,9 @@ onMounted(() => {
 .friend-links {
   display: grid;
   gap: 6px;
+}
+
+.friend-links {
   margin-top: 12px;
 }
 
@@ -488,6 +566,17 @@ onMounted(() => {
   color: #344054;
   font-size: 13px;
   border-radius: 8px;
+}
+
+.home-page__left--collapsed .home-menu a {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.home-page__left--collapsed .home-menu {
+  justify-items: center;
 }
 
 .home-menu a:hover,
@@ -774,6 +863,10 @@ onMounted(() => {
     grid-template-columns: 168px minmax(0, 1fr);
   }
 
+  .home-page--sidebar-collapsed {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
   .home-page__right {
     grid-column: 1 / -1;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -791,6 +884,7 @@ onMounted(() => {
 
 @media (max-width: 860px) {
   .home-page,
+  .home-page--sidebar-collapsed,
   .home-page__right,
   .top-grid {
     grid-template-columns: 1fr;
@@ -798,6 +892,10 @@ onMounted(() => {
 
   .home-page__left {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-page__left--collapsed {
+    grid-template-columns: 1fr;
   }
 
   .filing-text {
