@@ -3,6 +3,8 @@ spring:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:codenest_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
     username: ${MYSQL_USERNAME:codenest}
     password: ${MYSQL_PASSWORD:codenest}
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-migration
   security:
     oauth2:
       resourceserver:

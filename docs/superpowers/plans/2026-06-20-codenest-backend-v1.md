@@ -115,6 +115,7 @@ backend/
     application-dev.yml
     db/migration/
       V1__init_schema.sql
+    db/dev-migration/
       V2__seed_dev_data.sql
   src/test/java/com/codenest/backend/
     auth/AuthIntegrationTest.java
@@ -382,7 +383,7 @@ assertThat(response.getData()).isNull();
 
 **Files:**
 - Create: `backend/src/main/resources/db/migration/V1__init_schema.sql`
-- Create: `backend/src/main/resources/db/migration/V2__seed_dev_data.sql`
+- Create: `backend/src/main/resources/db/dev-migration/V2__seed_dev_data.sql`
 
 - [ ] **Step 1: Create all V1 tables**
 
@@ -413,7 +414,7 @@ unique key uk_file_objects_bucket_key (bucket, object_key)
 
 - [ ] **Step 3: Seed dev data**
 
-Insert one admin, one normal user, three categories, and a small sensitive-word set. Use stable usernames:
+Insert one admin, one normal user, three categories, and a small sensitive-word set in the dev-only Flyway location. Use stable usernames:
 
 ```text
 admin, writer
