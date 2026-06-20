@@ -2,6 +2,7 @@ package com.codenest.backend.config;
 
 import com.codenest.backend.common.ApiResponse;
 import com.codenest.backend.common.ErrorCode;
+import com.codenest.backend.security.AdminAuthorizationManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -17,7 +18,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper)
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      ObjectMapper objectMapper,
+      AdminAuthorizationManager adminAuthorizationManager)
       throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
@@ -26,14 +30,15 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/posts/**", "/categories", "/users/**")
                     .permitAll()
+                    .requestMatchers("/admin/**")
+                    .access(adminAuthorizationManager)
                     .requestMatchers(
                         "/auth/me",
                         "/auth/sync",
                         "/creator/**",
                         "/messages/**",
                         "/notifications/**",
-                        "/uploads/**",
-                        "/admin/**")
+                        "/uploads/**")
                     .authenticated()
                     .anyRequest()
                     .authenticated())

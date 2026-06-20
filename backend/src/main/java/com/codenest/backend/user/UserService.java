@@ -6,6 +6,7 @@ import com.codenest.backend.security.ClerkUserSyncService.ClerkProfile;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,16 +14,39 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService extends ServiceImpl<UserMapper, UserEntity> {
   private static final Pattern INVALID_USERNAME_CHARS = Pattern.compile("[^a-zA-Z0-9_]");
   private static final int USERNAME_MAX_LENGTH = 64;
+  private static final int MAX_CREATE_ATTEMPTS = 5;
 
   @Transactional
   public UserEntity syncFromClerk(ClerkProfile profile) {
     UserEntity user = findByClerkUserId(profile.clerkUserId());
     if (user == null) {
-      user = createUser(profile);
-      save(user);
-      return user;
+      return createWithDuplicateRetry(profile);
     }
 
+    return updateFromClerkProfile(user, profile);
+  }
+
+  private UserEntity createWithDuplicateRetry(ClerkProfile profile) {
+    DuplicateKeyException lastDuplicate = null;
+
+    for (int attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
+      UserEntity user = createUser(profile, attempt);
+      try {
+        save(user);
+        return user;
+      } catch (DuplicateKeyException exception) {
+        lastDuplicate = exception;
+        UserEntity existing = findByClerkUserId(profile.clerkUserId());
+        if (existing != null) {
+          return updateFromClerkProfile(existing, profile);
+        }
+      }
+    }
+
+    throw new IllegalStateException("Unable to create synced user", lastDuplicate);
+  }
+
+  private UserEntity updateFromClerkProfile(UserEntity user, ClerkProfile profile) {
     boolean changed = applyProfileUpdates(user, profile);
     if (changed) {
       user.setUpdatedAt(LocalDateTime.now());
@@ -36,11 +60,11 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
         new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getClerkUserId, clerkUserId), false);
   }
 
-  private UserEntity createUser(ClerkProfile profile) {
+  private UserEntity createUser(ClerkProfile profile, int attempt) {
     LocalDateTime now = LocalDateTime.now();
     UserEntity user = new UserEntity();
     user.setClerkUserId(profile.clerkUserId());
-    user.setUsername(resolveUniqueUsername(profile.username(), profile.clerkUserId()));
+    user.setUsername(resolveUniqueUsername(profile.username(), profile.clerkUserId(), attempt));
     user.setDisplayName(defaultDisplayName(profile.displayName(), user.getUsername()));
     user.setAvatarUrl(defaultString(profile.avatarUrl()));
     user.setBio("");
@@ -73,7 +97,7 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
     return changed;
   }
 
-  private String resolveUniqueUsername(String claimUsername, String clerkUserId) {
+  private String resolveUniqueUsername(String claimUsername, String clerkUserId, int attempt) {
     String base = normalizeUsername(claimUsername);
     if (base == null) {
       base = normalizeUsername(clerkUserId);
@@ -82,13 +106,16 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
       base = "user";
     }
 
+    if (attempt > 0) {
+      return withSuffix(base, usernameSuffix(clerkUserId, attempt));
+    }
+
     String candidate = truncate(base, USERNAME_MAX_LENGTH);
     if (!usernameExists(candidate)) {
       return candidate;
     }
 
-    String suffix = "_" + Integer.toUnsignedString(clerkUserId.hashCode(), 36);
-    return truncate(base, USERNAME_MAX_LENGTH - suffix.length()) + suffix;
+    return withSuffix(base, usernameSuffix(clerkUserId, 0));
   }
 
   private boolean usernameExists(String username) {
@@ -108,6 +135,15 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
 
   private String truncate(String value, int maxLength) {
     return value.length() <= maxLength ? value : value.substring(0, maxLength);
+  }
+
+  private String withSuffix(String base, String suffix) {
+    return truncate(base, USERNAME_MAX_LENGTH - suffix.length()) + suffix;
+  }
+
+  private String usernameSuffix(String clerkUserId, int attempt) {
+    String suffix = "_" + Integer.toUnsignedString(clerkUserId.hashCode(), 36);
+    return attempt == 0 ? suffix : suffix + "_" + attempt;
   }
 
   private String defaultDisplayName(String displayName, String username) {

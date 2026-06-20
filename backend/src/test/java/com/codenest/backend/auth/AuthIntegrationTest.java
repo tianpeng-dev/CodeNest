@@ -101,4 +101,47 @@ class AuthIntegrationTest {
   void adminRoutesRejectUnauthenticatedRequests() throws Exception {
     mockMvc.perform(get("/admin/users")).andExpect(status().isUnauthorized());
   }
+
+  @Test
+  void adminRoutesRejectAuthenticatedNonAdminUsers() throws Exception {
+    mockMvc
+        .perform(
+            get("/admin/users")
+                .with(jwt().jwt(jwt -> jwt.subject("clerk_user_member").claim("username", "member"))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(40003));
+  }
+
+  @Test
+  void adminRoutesAllowLocalAdminPastSecurityLayer() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO users (
+          clerk_user_id,
+          username,
+          display_name,
+          avatar_url,
+          bio,
+          role,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, '', '', 'admin', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "clerk_user_admin",
+        "localadmin",
+        "Local Admin");
+
+    mockMvc
+        .perform(
+            get("/admin/users")
+                .with(
+                    jwt()
+                        .jwt(
+                            jwt ->
+                                jwt.subject("clerk_user_admin")
+                                    .claim("username", "localadmin")
+                                    .claim("name", "Local Admin"))))
+        .andExpect(status().isNotFound());
+  }
 }
