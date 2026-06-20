@@ -12,6 +12,7 @@
     "test": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
+    "@clerk/vue": "^2.4.6",
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.18.0",
     "axios-mock-adapter": "^2.1.0",

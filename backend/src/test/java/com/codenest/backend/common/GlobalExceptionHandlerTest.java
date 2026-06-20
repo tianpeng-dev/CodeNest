@@ -1,0 +1,149 @@
+package com.codenest.backend.common;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+class GlobalExceptionHandlerTest {
+  private MockMvc mockMvc;
+  private LocalValidatorFactoryBean validator;
+
+  @BeforeEach
+  @SuppressWarnings("removal")
+  void setUp() {
+    validator = new LocalValidatorFactoryBean();
+    validator.afterPropertiesSet();
+
+    mockMvc =
+        MockMvcBuilders.standaloneSetup(new TestController())
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .setValidator(validator)
+            .addDispatcherServletCustomizer(
+                dispatcherServlet -> dispatcherServlet.setThrowExceptionIfNoHandlerFound(true))
+            .build();
+  }
+
+  @AfterEach
+  void tearDown() {
+    validator.close();
+  }
+
+  @Test
+  void mapsValidationErrorsToBadRequestResponseContract() throws Exception {
+    mockMvc
+        .perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Bad request"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsBusinessExceptionToApiResponseContract() throws Exception {
+    mockMvc
+        .perform(get("/test/business-error"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(40004))
+        .andExpect(jsonPath("$.message").value("missing"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsMissingRouteToNotFoundResponseContract() throws Exception {
+    mockMvc
+        .perform(get("/test/missing"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(40004))
+        .andExpect(jsonPath("$.message").value("Not found"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsStaticResourceMissToNotFoundResponseContract() throws Exception {
+    mockMvc
+        .perform(get("/test/no-resource"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(40004))
+        .andExpect(jsonPath("$.message").value("Not found"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsUnsupportedMethodToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(post("/test/business-error"))
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(header().string(HttpHeaders.ALLOW, containsString("GET")))
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Method not allowed"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsMalformedJsonToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Bad request"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsUnsupportedContentTypeToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(
+            post("/test/validate")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content("name=nest"))
+        .andExpect(status().isUnsupportedMediaType())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Bad request"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @RestController
+  static class TestController {
+    @PostMapping("/test/validate")
+    void validate(@Valid @RequestBody TestRequest request) {}
+
+    @GetMapping("/test/business-error")
+    void businessError() {
+      throw new BusinessException(ErrorCode.NOT_FOUND, "missing");
+    }
+
+    @GetMapping("/test/no-resource")
+    void noResource() throws NoResourceFoundException {
+      throw new NoResourceFoundException(HttpMethod.GET, "/static/missing.css");
+    }
+  }
+
+  record TestRequest(@NotBlank String name) {}
+}

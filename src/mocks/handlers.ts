@@ -46,6 +46,7 @@ let likedPostIds = new Set<string>();
 let dislikedPostIds = new Set<string>();
 let favoritePostIds = new Set<string>();
 let accounts: MockAccount[] = [];
+let syncedMockBearerTokens = new Set<string>();
 
 function seedPosts(): Post[] {
   return clone([
@@ -79,6 +80,7 @@ export function resetMockState() {
   likedPostIds = new Set<string>();
   dislikedPostIds = new Set<string>();
   favoritePostIds = new Set<string>();
+  syncedMockBearerTokens = new Set<string>();
   accounts = [
     { username: 'writer', password: 'password123', user: users[1] },
     { username: 'admin', password: 'admin123', user: users[0] },
@@ -121,7 +123,21 @@ function readToken(config: AxiosRequestConfig): string | null {
 function currentUser(config: AxiosRequestConfig): User | null {
   const token = readToken(config);
   const account = accounts.find((item) => token === `mock-token-${item.username}`);
-  return account?.user ?? null;
+  return account?.user ?? (token && syncedMockBearerTokens.has(token)
+    ? accounts.find((item) => item.username === 'writer')?.user ?? null
+    : null);
+}
+
+function mockSyncedUser(config: AxiosRequestConfig): User | null {
+  const user = currentUser(config);
+  const token = readToken(config);
+
+  if (user || !token) {
+    return user;
+  }
+
+  syncedMockBearerTokens.add(token);
+  return accounts.find((item) => item.username === 'writer')?.user ?? null;
 }
 
 function pageOf<T>(
@@ -459,6 +475,11 @@ export function registerMockHandlers(mock: AxiosMockAdapter) {
     const unauthorized = protectedReply(config);
     const user = currentUser(config);
     return unauthorized ?? ok(user);
+  });
+
+  mock.onPost('/auth/sync').reply((config) => {
+    const user = mockSyncedUser(config);
+    return user ? ok(user) : fail(401, '请先登录');
   });
 
   mock.onGet('/posts').reply((config) => listPosts(config));
