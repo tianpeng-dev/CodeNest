@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -21,17 +22,26 @@ import org.springframework.web.bind.annotation.RestController;
 
 class GlobalExceptionHandlerTest {
   private MockMvc mockMvc;
+  private LocalValidatorFactoryBean validator;
 
   @BeforeEach
+  @SuppressWarnings("removal")
   void setUp() {
-    LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+    validator = new LocalValidatorFactoryBean();
     validator.afterPropertiesSet();
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(new TestController())
             .setControllerAdvice(new GlobalExceptionHandler())
             .setValidator(validator)
+            .addDispatcherServletCustomizer(
+                dispatcherServlet -> dispatcherServlet.setThrowExceptionIfNoHandlerFound(true))
             .build();
+  }
+
+  @AfterEach
+  void tearDown() {
+    validator.close();
   }
 
   @Test
@@ -54,6 +64,26 @@ class GlobalExceptionHandlerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value(40004))
         .andExpect(jsonPath("$.message").value("missing"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsMissingRouteToNotFoundResponseContract() throws Exception {
+    mockMvc
+        .perform(get("/test/missing"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(40004))
+        .andExpect(jsonPath("$.message").value("Not found"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  void mapsUnsupportedMethodToClientErrorResponseContract() throws Exception {
+    mockMvc
+        .perform(post("/test/business-error"))
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(jsonPath("$.code").value(40000))
+        .andExpect(jsonPath("$.message").value("Method not allowed"))
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 

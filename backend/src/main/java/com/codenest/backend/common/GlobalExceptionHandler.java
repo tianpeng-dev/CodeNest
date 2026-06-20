@@ -4,15 +4,19 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
   private static final String BAD_REQUEST_MESSAGE = "Bad request";
+  private static final String METHOD_NOT_ALLOWED_MESSAGE = "Method not allowed";
+  private static final String NOT_FOUND_MESSAGE = "Not found";
   private static final String SERVER_ERROR_MESSAGE = "Internal server error";
 
   @ExceptionHandler(BusinessException.class)
@@ -31,6 +35,19 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(ApiResponse.error(ErrorCode.BAD_REQUEST, BAD_REQUEST_MESSAGE));
+  }
+
+  @ExceptionHandler(NoHandlerFoundException.class)
+  public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException exception) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(ApiResponse.error(ErrorCode.NOT_FOUND, NOT_FOUND_MESSAGE));
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+      HttpRequestMethodNotSupportedException exception) {
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+        .body(ApiResponse.error(ErrorCode.BAD_REQUEST, METHOD_NOT_ALLOWED_MESSAGE));
   }
 
   @ExceptionHandler(Exception.class)
