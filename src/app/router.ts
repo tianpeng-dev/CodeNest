@@ -13,7 +13,7 @@ declare module 'vue-router' {
 
 function loginRedirect(target: string) {
   return {
-    path: '/login',
+    path: '/sign-in',
     query: {
       redirect: target,
     },
@@ -84,6 +84,22 @@ export const router = createRouter({
           name: 'messages',
           component: () => import('@/pages/public/MessagesPage.vue'),
           meta: { access: 'user', title: '私信' },
+        },
+        {
+          path: 'sign-in',
+          name: 'sign-in',
+          component: () => import('@/views/sign-in.vue'),
+          meta: {
+            access: 'public',
+            title: '登录',
+            description: '登录 CodeNest，进入创作中心、通知和私信。',
+          },
+        },
+        {
+          path: 'sign-up',
+          name: 'sign-up',
+          component: () => import('@/views/sign-up.vue'),
+          meta: { access: 'public', title: '注册' },
         },
       ],
     },
@@ -182,7 +198,10 @@ export const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/pages/auth/LoginPage.vue'),
+      redirect: (to) => ({
+        path: '/sign-in',
+        query: to.query,
+      }),
       meta: {
         access: 'public',
         title: '登录',
@@ -192,7 +211,10 @@ export const router = createRouter({
     {
       path: '/register',
       name: 'register',
-      component: () => import('@/pages/auth/RegisterPage.vue'),
+      redirect: (to) => ({
+        path: '/sign-up',
+        query: to.query,
+      }),
       meta: { access: 'public', title: '注册' },
     },
     {
@@ -227,7 +249,7 @@ router.beforeEach(async (to) => {
 
   const authStore = useAuthStore();
 
-  if (authStore.token && !authStore.currentUser) {
+  if (!authStore.currentUser) {
     try {
       await authStore.loadCurrentUser();
     } catch {
@@ -235,7 +257,7 @@ router.beforeEach(async (to) => {
     }
   }
 
-  if (!authStore.token || !authStore.currentUser) {
+  if (!authStore.currentUser) {
     return loginRedirect(to.fullPath);
   }
 

@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
 import { resetMockApi, setupMockApi } from '@/mocks/mock';
+import { setAuthTokenProvider } from '@/services/http';
+import { syncCurrentUser } from '@/services/auth.service';
 import { getAdminMetrics } from '@/services/admin.service';
 import { getNotifications, markNotificationRead } from '@/services/notification.service';
 import { getThreads, getThreadMessages, mockSendMessage } from '@/services/message.service';
@@ -19,6 +21,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   resetMockApi();
+  setAuthTokenProvider(null);
   window.localStorage.clear();
 });
 
@@ -101,6 +104,24 @@ describe('post service', () => {
         status: 'draft',
       }),
     ).rejects.toThrow('请先登录');
+  });
+
+  it('allows protected mock calls after syncing a Clerk session token', async () => {
+    setAuthTokenProvider(() => 'clerk-session-token');
+
+    const user = await syncCurrentUser();
+    const draft = await createDraft({
+      title: 'Synced Clerk token draft',
+      summary: 'Mock mode accepts a Clerk token after sync.',
+      content: 'The synced token should continue to identify the writer.',
+      coverUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085',
+      categoryId: 'cat-frontend',
+      tags: ['Auth'],
+      status: 'draft',
+    });
+
+    expect(user.username).toBe('chen-dev');
+    expect(draft.author.username).toBe('chen-dev');
   });
 
   it('rejects admin calls for normal users', async () => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/vue';
 import { ref, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
 import { Menu, Plus, Search } from '@element-plus/icons-vue';
@@ -53,8 +54,17 @@ watch(
         </form>
 
         <div class="public-layout__actions" aria-label="账号与创作入口">
-          <RouterLink class="public-layout__login" to="/login">登录</RouterLink>
-          <RouterLink class="public-layout__register" to="/register">注册</RouterLink>
+          <Show when="signed-out">
+            <SignInButton mode="redirect" fallback-redirect-url="/">
+              <button class="public-layout__login" type="button">登录</button>
+            </SignInButton>
+            <SignUpButton mode="redirect" fallback-redirect-url="/creator/overview">
+              <button class="public-layout__register" type="button">注册</button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton after-sign-out-url="/" />
+          </Show>
           <RouterLink
             class="public-layout__post-button"
             to="/creator/editor"
@@ -155,6 +165,8 @@ watch(
   flex: 0 0 auto;
   white-space: nowrap;
   text-decoration: none;
+  border: 0;
+  cursor: pointer;
 }
 
 .public-layout__search-button {
@@ -186,6 +198,7 @@ watch(
   width: 40px;
   height: 40px;
   color: #344054;
+  font: inherit;
   font-size: 14px;
   background: #f0f1f5;
   border-radius: 999px;
@@ -198,8 +211,10 @@ watch(
 
 .public-layout__register {
   color: #ff5a3d;
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
+  background: transparent;
 }
 
 .public-layout__register:hover {

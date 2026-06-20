@@ -36,3 +36,7 @@ export async function logout(): Promise<null> {
 export async function getCurrentUser(): Promise<User> {
   return unwrap(await http.get<ApiResponse<User>>('/auth/me'));
 }
+
+export async function syncCurrentUser(): Promise<User> {
+  return unwrap(await http.post<ApiResponse<User>>('/auth/sync'));
+}

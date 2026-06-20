@@ -1,6 +1,6 @@
 # CodeNest
 
-CodeNest is a Vue 3 frontend prototype for a technical blog and forum platform.
+CodeNest is a technical blog and forum platform with a Vue 3 frontend and a Spring Boot 3 backend.
 
 ## Tech Stack
 
@@ -11,7 +11,10 @@ CodeNest is a Vue 3 frontend prototype for a technical blog and forum platform.
 - Vue Router
 - Pinia
 - Axios
-- Mock API
+- Spring Boot 3
+- MyBatis-Plus
+- MySQL 8.0
+- Clerk
 
 ## Development
 
@@ -23,14 +26,18 @@ npm run dev
 Frontend integration settings:
 
 ```bash
-VITE_API_BASE_URL=/api
+VITE_API_BASE_URL=http://localhost:8080/api
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_placeholder
 ```
+
+Set `VITE_USE_MOCK_API=true` only when you want the frontend to use the local Axios mock data instead of the Spring Boot API.
 
 Backend integration settings:
 
 ```bash
 CODENEST_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-site.netlify.app
+CLERK_ISSUER=https://your-clerk-instance.clerk.accounts.dev
+CLERK_JWKS_URI=https://your-clerk-instance.clerk.accounts.dev/.well-known/jwks.json
 ```
 
 ## Verification
@@ -39,6 +46,9 @@ CODENEST_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-site.netlify.ap
 npm run build
 npm run test:unit
 npm run test:e2e
+
+cd backend
+mvn test
 ```
 
 ## Test Accounts
@@ -52,9 +62,9 @@ npm run test:e2e
 - Authenticated user: creator center, editor, content management, notifications, and messages.
 - Admin: dashboard, users, posts, categories, moderators, sensitive words, and analytics.
 
-## Scope
+## Backend Scope
 
-V1 is frontend-only. Backend integration, real-time messaging, real AI generation, and deep moderation workflows are outside V1.
+The backend includes Clerk JWT authentication, user sync, categories, posts, comments, sensitive-word moderation, follows, notifications, messages, uploads, admin APIs, moderator-scoped review, analytics, Flyway migrations, and OpenAPI docs.
 
 ## Deployment Notes
 

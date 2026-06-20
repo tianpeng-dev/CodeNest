@@ -4,11 +4,6 @@ export type AuthTokenProvider = () => Promise<string | null> | string | null;
 
 declare global {
   interface Window {
-    Clerk?: {
-      session?: {
-        getToken?: AuthTokenProvider;
-      };
-    };
     __codenestAuthTokenProvider?: AuthTokenProvider;
   }
 }

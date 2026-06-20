@@ -9,6 +9,50 @@ function readStoredToken() {
   return typeof window === 'undefined' ? null : window.localStorage.getItem(tokenKey);
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function readClerkSessionToken(timeoutMs = 2000) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const clerk = window.Clerk;
+
+    if (!clerk) {
+      await wait(25);
+      continue;
+    }
+
+    if (clerk.loaded && clerk.session !== undefined) {
+      return clerk.session?.getToken?.() ?? null;
+    }
+
+    return new Promise<string | null>((resolve) => {
+      const timer = window.setTimeout(() => {
+        unsubscribe();
+        resolve(null);
+      }, Math.max(0, deadline - Date.now()));
+
+      const unsubscribe = clerk.addListener(async ({ session }) => {
+        if (session === undefined) {
+          return;
+        }
+
+        window.clearTimeout(timer);
+        unsubscribe();
+        resolve(session?.getToken?.() ?? null);
+      });
+    });
+  }
+
+  return null;
+}
+
 function persistToken(token: string | null) {
   if (typeof window === 'undefined') return;
 
@@ -76,13 +120,19 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async loadCurrentUser() {
-      if (!this.token) {
+      const storedToken = readStoredToken();
+      const clerkToken = storedToken ? null : await readClerkSessionToken();
+
+      if (!storedToken && !clerkToken) {
         this.clearAuth();
         return null;
       }
 
       try {
-        const user = await authService.getCurrentUser();
+        this.token = storedToken ?? clerkToken;
+        const user = storedToken
+          ? await authService.getCurrentUser()
+          : await authService.syncCurrentUser();
         this.currentUser = user;
         return user;
       } catch (error) {
