@@ -337,6 +337,27 @@ class PostIntegrationTest {
   }
 
   @Test
+  void conditionalReactionDeleteDoesNotRemoveStaleReaction() {
+    Long postId = insertPost(ownerId, categoryId, "Stale reaction delete", "published", 0, 0, 0);
+    Long userId = otherId();
+    insertReaction(postId, userId, "dislike");
+
+    int staleDeleted = postReactionMapper.deleteReactionIfCurrent(postId, userId, "like");
+    assertThat(staleDeleted).isZero();
+
+    String reaction =
+        jdbcTemplate.queryForObject(
+            "SELECT reaction FROM post_reactions WHERE post_id = ? AND user_id = ?",
+            String.class,
+            postId,
+            userId);
+    assertThat(reaction).isEqualTo("dislike");
+
+    int currentDeleted = postReactionMapper.deleteReactionIfCurrent(postId, userId, "dislike");
+    assertThat(currentDeleted).isEqualTo(1);
+  }
+
+  @Test
   void favoriteTogglesAndKeepsCounterCorrect() throws Exception {
     Long postId = insertPost(ownerId, categoryId, "Favorite target", "published", 0, 0, 0);
 

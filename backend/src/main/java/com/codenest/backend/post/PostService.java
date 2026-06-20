@@ -258,7 +258,9 @@ public class PostService extends ServiceImpl<PostMapper, PostEntity> {
         incrementReactionCount(post.getId(), targetReaction);
       }
     } else if (targetReaction.equals(reaction.getReaction())) {
-      if (postReactionMapper.deleteById(reaction.getId()) > 0) {
+      if (postReactionMapper.deleteReactionIfCurrent(
+              post.getId(), currentUser.id(), targetReaction)
+          > 0) {
         decrementReactionCount(post.getId(), targetReaction);
       }
     } else {
