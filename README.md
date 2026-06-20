@@ -20,6 +20,19 @@ npm install
 npm run dev
 ```
 
+Frontend integration settings:
+
+```bash
+VITE_API_BASE_URL=/api
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_placeholder
+```
+
+Backend integration settings:
+
+```bash
+CODENEST_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-site.netlify.app
+```
+
 ## Verification
 
 ```bash
