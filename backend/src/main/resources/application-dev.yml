@@ -3,6 +3,12 @@ spring:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:codenest_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
     username: ${MYSQL_USERNAME:codenest}
     password: ${MYSQL_PASSWORD:codenest}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${CLERK_ISSUER:http://localhost:8081}
+          jwk-set-uri: ${CLERK_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
 
 codenest:
   storage:
