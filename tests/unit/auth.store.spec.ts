@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { canAccessRoute } from '@/app/permissions';
 import { resetMockApi, setupMockApi } from '@/mocks/mock';
@@ -11,6 +11,7 @@ beforeAll(() => {
 beforeEach(() => {
   resetMockApi();
   window.localStorage.clear();
+  delete (window as typeof window & { Clerk?: unknown }).Clerk;
   setActivePinia(createPinia());
 });
 
@@ -79,6 +80,40 @@ describe('auth store', () => {
     expect(authStore.isLoggedIn).toBe(true);
     expect(authStore.isAdmin).toBe(false);
     expect(canAccessRoute('user', authStore.currentUser)).toBe(true);
+  });
+
+  it('waits for a Clerk session token before syncing the current user', async () => {
+    const authStore = useAuthStore();
+    let listener: ((payload: { session?: { getToken: () => Promise<string> } | null }) => void) | null = null;
+    const session = {
+      getToken: vi.fn(() => Promise.resolve('delayed-clerk-session-token')),
+    };
+
+    (window as typeof window & {
+      Clerk: {
+        loaded: boolean;
+        session?: typeof session | null;
+        addListener: (callback: typeof listener) => () => void;
+      };
+    }).Clerk = {
+      loaded: false,
+      session: undefined,
+      addListener: (callback) => {
+        listener = callback;
+        return vi.fn();
+      },
+    };
+
+    const userPromise = authStore.loadCurrentUser();
+    await Promise.resolve();
+
+    (window as typeof window & { Clerk: { loaded: boolean; session: typeof session } }).Clerk.loaded = true;
+    (window as typeof window & { Clerk: { loaded: boolean; session: typeof session } }).Clerk.session = session;
+    listener?.({ session });
+
+    await expect(userPromise).resolves.toMatchObject({ username: 'chen-dev' });
+    expect(authStore.token).toBe('delayed-clerk-session-token');
+    expect(authStore.currentUser?.username).toBe('chen-dev');
   });
 
   it('logs out and clears auth state', async () => {

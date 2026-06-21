@@ -2,14 +2,12 @@
 import { SignUp } from '@clerk/vue';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { safeRedirectTarget } from '@/app/auth-redirect';
 
 const route = useRoute();
 
 const redirectTarget = computed(() => {
-  const redirect = String(route.query.redirect ?? '');
-  return redirect.startsWith('/') && !redirect.startsWith('//')
-    ? redirect
-    : '/creator/overview';
+  return safeRedirectTarget(route.query.redirect, '/creator/overview');
 });
 </script>
 

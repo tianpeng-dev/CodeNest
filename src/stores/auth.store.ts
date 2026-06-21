@@ -13,7 +13,7 @@ function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function readClerkSessionToken(timeoutMs = 2000) {
+async function readClerkSessionToken(timeoutMs = 8000) {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -28,26 +28,35 @@ async function readClerkSessionToken(timeoutMs = 2000) {
       continue;
     }
 
-    if (clerk.loaded && clerk.session !== undefined) {
-      return clerk.session?.getToken?.() ?? null;
+    if (clerk.loaded && clerk.session === null) {
+      return null;
     }
 
-    return new Promise<string | null>((resolve) => {
+    if (clerk.loaded && clerk.session?.getToken) {
+      return clerk.session.getToken();
+    }
+
+    const listenerToken = await new Promise<string | null | undefined>((resolve) => {
+      let unsubscribe: (() => void) | undefined;
       const timer = window.setTimeout(() => {
-        unsubscribe();
-        resolve(null);
+        unsubscribe?.();
+        resolve(undefined);
       }, Math.max(0, deadline - Date.now()));
 
-      const unsubscribe = clerk.addListener(async ({ session }) => {
+      unsubscribe = clerk.addListener(async ({ session }) => {
         if (session === undefined) {
           return;
         }
 
         window.clearTimeout(timer);
-        unsubscribe();
-        resolve(session?.getToken?.() ?? null);
+        unsubscribe?.();
+        resolve(session?.getToken ? await session.getToken() : null);
       });
     });
+
+    if (listenerToken !== undefined) {
+      return listenerToken;
+    }
   }
 
   return null;

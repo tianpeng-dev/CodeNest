@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { canAccessRoute, type RouteAccess } from './permissions';
 import { setPageDescription, setPageTitle } from './head';
+import { hasInternalAuthQuery, safeRedirectTarget, stripInternalAuthQuery } from './auth-redirect';
 import { useAuthStore } from '@/stores/auth.store';
 
 declare module 'vue-router' {
@@ -15,7 +16,7 @@ function loginRedirect(target: string) {
   return {
     path: '/sign-in',
     query: {
-      redirect: target,
+      redirect: safeRedirectTarget(target, '/'),
     },
   };
 }
@@ -263,6 +264,10 @@ router.beforeEach(async (to) => {
 
   if (!canAccessRoute(access, authStore.currentUser)) {
     return { path: '/403' };
+  }
+
+  if (hasInternalAuthQuery(to.query)) {
+    return stripInternalAuthQuery(to.fullPath);
   }
 
   return true;
