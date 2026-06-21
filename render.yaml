@@ -1,33 +1,12 @@
-envVarGroups:
-  - name: codenest-mysql-app-env
-    envVars:
-      - key: MYSQL_DATABASE
-        value: codenest
-      - key: MYSQL_USER
-        value: codenest
-      - key: MYSQL_USERNAME
-        value: codenest
-      - key: MYSQL_PASSWORD
-        generateValue: true
+databases:
+  - name: codenest-postgres
+    databaseName: codenest
+    user: codenest
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
 
 services:
-  - type: pserv
-    name: codenest-mysql
-    runtime: docker
-    plan: starter
-    region: oregon
-    repo: https://github.com/render-examples/mysql.git
-    branch: main
-    autoDeploy: false
-    disk:
-      name: codenest-mysql-data
-      mountPath: /var/lib/mysql
-      sizeGB: 10
-    envVars:
-      - fromGroup: codenest-mysql-app-env
-      - key: MYSQL_ROOT_PASSWORD
-        generateValue: true
-
   - type: web
     name: codenest-backend
     runtime: docker
@@ -40,22 +19,34 @@ services:
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /api/v3/api-docs
     envVars:
-      - fromGroup: codenest-mysql-app-env
       - key: SPRING_PROFILES_ACTIVE
         value: default
       - key: CODENEST_CORS_ALLOWED_ORIGINS
         value: http://localhost:5173,https://codenest-tp.netlify.app,https://master--codenest-tp.netlify.app
-      - key: MYSQL_HOST
-        fromService:
-          name: codenest-mysql
-          type: pserv
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: codenest-postgres
           property: host
-      - key: MYSQL_PORT
-        value: 3306
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: codenest-postgres
+          property: port
+      - key: POSTGRES_DATABASE
+        fromDatabase:
+          name: codenest-postgres
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: codenest-postgres
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: codenest-postgres
+          property: password
       - key: CLERK_ISSUER
-        sync: false
+        value: https://present-warthog-36.clerk.accounts.dev
       - key: CLERK_JWKS_URI
-        sync: false
+        value: https://present-warthog-36.clerk.accounts.dev/.well-known/jwks.json
       - key: S3_ENDPOINT
         value: https://77e355bb031ae797643a27a40d045b19.r2.cloudflarestorage.com
       - key: S3_REGION

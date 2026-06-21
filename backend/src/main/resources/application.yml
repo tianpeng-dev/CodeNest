@@ -7,9 +7,9 @@ spring:
   application:
     name: codenest-backend
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:codenest}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-    username: ${MYSQL_USERNAME:codenest}
-    password: ${MYSQL_PASSWORD:codenest}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:codenest}
+    username: ${POSTGRES_USER:codenest}
+    password: ${POSTGRES_PASSWORD:codenest}
   flyway:
     enabled: true
   security:
