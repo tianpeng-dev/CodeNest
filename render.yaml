@@ -1,4 +1,33 @@
+envVarGroups:
+  - name: codenest-mysql-app-env
+    envVars:
+      - key: MYSQL_DATABASE
+        value: codenest
+      - key: MYSQL_USER
+        value: codenest
+      - key: MYSQL_USERNAME
+        value: codenest
+      - key: MYSQL_PASSWORD
+        generateValue: true
+
 services:
+  - type: pserv
+    name: codenest-mysql
+    runtime: docker
+    plan: starter
+    region: oregon
+    repo: https://github.com/render-examples/mysql.git
+    branch: main
+    autoDeploy: false
+    disk:
+      name: codenest-mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - fromGroup: codenest-mysql-app-env
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
   - type: web
     name: codenest-backend
     runtime: docker
@@ -11,20 +40,18 @@ services:
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /api/v3/api-docs
     envVars:
+      - fromGroup: codenest-mysql-app-env
       - key: SPRING_PROFILES_ACTIVE
         value: default
       - key: CODENEST_CORS_ALLOWED_ORIGINS
         value: http://localhost:5173,https://codenest-tp.netlify.app,https://master--codenest-tp.netlify.app
       - key: MYSQL_HOST
-        sync: false
+        fromService:
+          name: codenest-mysql
+          type: pserv
+          property: host
       - key: MYSQL_PORT
         value: 3306
-      - key: MYSQL_DATABASE
-        value: codenest
-      - key: MYSQL_USERNAME
-        sync: false
-      - key: MYSQL_PASSWORD
-        sync: false
       - key: CLERK_ISSUER
         sync: false
       - key: CLERK_JWKS_URI
