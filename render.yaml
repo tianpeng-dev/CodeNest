@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: codenest-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    repo: https://github.com/tianpeng-dev/CodeNest.git
+    branch: master
+    autoDeploy: true
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/v3/api-docs
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: default
+      - key: CODENEST_CORS_ALLOWED_ORIGINS
+        value: http://localhost:5173,https://codenest-tp.netlify.app,https://master--codenest-tp.netlify.app
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        value: 3306
+      - key: MYSQL_DATABASE
+        value: codenest
+      - key: MYSQL_USERNAME
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: CLERK_ISSUER
+        sync: false
+      - key: CLERK_JWKS_URI
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_PUBLIC_BASE_URL
+        sync: false
+      - key: S3_PATH_STYLE
+        value: true
