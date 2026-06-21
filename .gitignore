@@ -10,6 +10,7 @@ lerna-debug.log*
 .superpowers/
 .worktrees
 node_modules/
+target/
 dist/
 dist-ssr
 *.local
