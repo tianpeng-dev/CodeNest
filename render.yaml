@@ -1,6 +1,6 @@
 databases:
   - name: codenest-postgres
-    databaseName: codenest
+    databaseName: codenest_dtb6
     user: codenest
     plan: free
     region: oregon
